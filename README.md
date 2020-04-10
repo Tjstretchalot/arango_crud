@@ -58,8 +58,11 @@ config = Config(
     auth=JWTAuth(
         username='root',
         password='',
-        lock_style='mutex', # See JWT Locking and Store
-        store_style='disk' # See JWT Locking and Store
+        lock_style='disk', # See JWT Locking and Store for remaining
+        lock_file='.arango_jwt.lock',
+        lock_time_seconds=10,
+        store_style='disk',
+        store_file='.arango_jwt'
     ),
     server_failures={ # see Server Failures
         'strategy': 'step-back-off',
@@ -251,7 +254,7 @@ This repository is focused specifically on using ArangoDB as a disk-based
 cache. Functionality which doesn't support that use-case will have their PR
 closed with the recommendation that they fork.
 
-## Setup Development (Windows)
+### Setup Development (Windows)
 
 [Install ArangoDB](https://www.arangodb.com/download-major/) on default
 development settings.
@@ -268,7 +271,7 @@ coverage run --source=examples examples/run_all.py
 coverage report
 ```
 
-## Setup Development (*Nix)
+### Setup Development (*Nix)
 
 ```bash
 docker pull arangodb/arangodb
@@ -283,3 +286,46 @@ coverage report
 coverage run --source=examples examples/run_all.py
 coverage report
 ```
+
+## Request Styles
+
+When working with an ArangoDB cluster, it's important that the clients
+distribute their requests amongst the various coordinators. This is why the
+IP address of the coordinators is a list of addresses. The request styles
+supported are `round-robin`, `weighted-round-robin`, and `random`
+
+### Round Robin
+
+### Weighted Round Robin
+
+### Random
+
+## Server Failures
+
+When a request fails due to a server-side issue it's usually desirable to try
+again on a new coordinator. A small sleep is also helpful to avoid suddenly
+massively spiking traffic to the coordinators whenever they hiccup. This
+supports only a `step-back-off` policy. If the steps are `[0.1, 0.5, 1]` then
+on the first server error this waits 0.1 seconds then tries again. If that
+also fails this waits 0.5 seconds then tries again. If that fails this waits
+1 second then tries again. If that fails, an error is raised.
+
+## JWT Locking and Store
+
+It's usually not a good idea to create a lot of new tokens when a client is
+misbehaving, as token generation is generally meant to be expensive in order to
+be secure. Hence JWT is necessarily stateful on the Config - rather than just
+being able to create network requests we first need to fetch the JWT.
+Furthermore, we may need to refresh the token on arbitrary requests.
+
+The recommended way to handle JWT's is the `'disk'` style. A file will contain
+the JWT and some metadata about it, which will be accessed in a safe way for
+even highly concurrent environments, meaning that every instance running
+arango_crud on the same machine using the same config will share JWT tokens
+and will only create/renew the token once per renewal period. This overhead is
+extremely minor for non-concurrent environments.
+
+If you're very confident that JWT generation is not going to be a significant
+source of load and there is no multithreading, a naive approach can be enabled
+with the lock and store style `None`. See the examples jwt_disk_example.py
+and jwt_none_example.py
