@@ -32,7 +32,7 @@ Supports python 3.7 or higher.
 #### Code-as-configuration BasicAuth
 
 ```py
-from arango_crub import Config, BasicAuth
+from arango_crud import Config, BasicAuth
 
 config = Config(
     cluster=['http://localhost:8529'],
