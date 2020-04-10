@@ -76,9 +76,9 @@ config.prepare()
 
 test.py
 ```py
-from arango_crud import EnvConfig
+from arango_crud import env_config
 
-config = EnvConfig()
+config = env_config()
 config.prepare() # recommended, not required
 ```
 
@@ -99,9 +99,9 @@ python test.py
 
 test.py
 ```py
-from arango_crud import EnvConfig
+from arango_crud import env_config
 
-config = EnvConfig()
+config = env_config()
 ```
 
 run.sh
@@ -149,10 +149,10 @@ export ARANGO_DEFAULT_DATABASE=test_db
 ```
 
 ```py
-from arango_crud import EnvConfig
+from arango_crud import env_config
 import time
 
-config = EnvConfig()
+config = env_config()
 config.prepare()
 
 db = config.database() # alt: config.database('my_db')
@@ -216,4 +216,70 @@ if not doc.read():
     doc.body = {'name': 'TJ', 'note': 'Pretty cool'}
     doc.replace()
 print(f'cached value: {doc.body}')
+```
+
+## Contributing
+
+This package adheres to pep8 guidelines unless an exception is listed in
+`.flake8`. Comments are explicitly line-broken at 80 characters. Code
+complexity measures (AbcComplexity, etc) are not used. This measures code
+coverage and a build of below 90% code coverage is considered failing. PRs
+which reduce code coverage must include an explanation of why. The examples
+directory should not contain non-functional lines of code, so instead of
+
+```py
+bar = foo()
+if bar is None:
+    print('Foo gave none!') # prints Foo
+else:
+    print('Something went wrong!')
+```
+
+it should be the easier to read assert variant, which plays friendlier with
+automated testing that the examples actually work:
+
+```py
+bar = foo()
+assert bar is None
+```
+
+Hence any PR where the coverage in the examples directory is less than 100%
+when running `coverage run --source=examples examples/run_all.py` will have
+changes requested.
+
+This repository is focused specifically on using ArangoDB as a disk-based
+cache. Functionality which doesn't support that use-case will have their PR
+closed with the recommendation that they fork.
+
+## Setup Development (Windows)
+
+[Install ArangoDB](https://www.arangodb.com/download-major/) on default
+development settings.
+
+```bat
+python -m venv venv
+python -m pip install --upgrade pip
+"venv/Scripts/activate.bat"
+python -m pip install -r dev_requirements.txt
+"scripts/windows_dev_env.bat"
+coverage run --source=src -m unittest discover -s tests
+coverage report
+coverage run --source=examples examples/run_all.py
+coverage report
+```
+
+## Setup Development (*Nix)
+
+```bash
+docker pull arangodb/arangodb
+docker run -e ARANGO_NO_AUTH=1 -p 8529/tcp arangodb/arangodb arangod --server-endpoint tcp://0.0.0.0:8529
+python -m venv venv
+python -m pip install --upgrade pip
+. venv/bin/activate
+. scripts/nix_dev_env.sh
+python -m pip install -r dev_requirements.txt
+coverage run --source=src -m unittest discover -s tests
+coverage report
+coverage run --source=examples examples/run_all.py
+coverage report
 ```
