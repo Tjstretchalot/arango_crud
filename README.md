@@ -16,8 +16,16 @@ you want to use ArangoDB as a disk-based cache, use arango_crud or similar.
 ***Note***: All the examples in this package assume TTL is being used to cleanup
 keys eventually. The TTL may be set to "-1" in environment variables to be
 disabled, or "None" in code to be disabled. In this case some other solution for
-cleaning up old keys is required.
+cleaning up old keys is required. A TTL index is only created when collections
+are initialized, so if this library is used with TTL disabled and then TTL is
+enabled, one must manually add the TTL indexes.
 https://www.arangodb.com/arangodb-training-center/ttl-indexes/
+
+***Note***: This is not intended to provide much configurability for creating
+databases or collections, providing only sane defaults for this particular
+use-case. It's recommended to use a migration structure where databases and
+collections are only initialized once and to call the appropriate HTTP endpoint
+directly: https://www.arangodb.com/docs/stable/http/collection-creating.html
 
 ## Usage
 
@@ -95,6 +103,8 @@ export ARANGO_REQUEST_STYLE=round-robin
 export ARANGO_AUTH=basic
 export ARANGO_USERNAME=root
 export ARANGO_PASSWORD=
+export ARANGO_DISABLE_DATABASE_DELETE=false
+export ARANGO_DISABLE_COLLECTION_DELETE=false
 python test.py
 ```
 
@@ -119,6 +129,8 @@ export ARANGO_AUTH_LOCK=mutex
 export ARANGO_AUTH_STORE=disk
 export ARANGO_USERNAME=root
 export ARANGO_PASSWORD=
+export ARANGO_DISABLE_DATABASE_DELETE=false
+export ARANGO_DISABLE_COLLECTION_DELETE=false
 python test.py
 ```
 
@@ -137,6 +149,8 @@ SET ARANGO_REQUEST_STYLE=round-robin
 SET ARANGO_AUTH=basic
 SET ARANGO_USERNAME=root
 SET ARANGO_DEFAULT_DATABASE=test_db
+SET ARANGO_DISABLE_DATABASE_DELETE=false
+SET ARANGO_DISABLE_COLLECTION_DELETE=false
 ```
 
 *Nix:
@@ -149,6 +163,8 @@ export ARANGO_AUTH=basic
 export ARANGO_USERNAME=root
 export ARANGO_PASSWORD=
 export ARANGO_DEFAULT_DATABASE=test_db
+export ARANGO_DISABLE_DATABASE_DELETE=false
+export ARANGO_DISABLE_COLLECTION_DELETE=false
 ```
 
 ```py
@@ -159,54 +175,59 @@ config = env_config()
 config.prepare()
 
 db = config.database() # alt: config.database('my_db')
+db.create_if_not_exists()
 coll = db.collection('users')
-coll.ensure()
+coll.create_if_not_exists()
 
 # The simplest interface
-coll.replace('tj', {'name': 'TJ'}) # True
-coll.read('tj') # {'name': 'TJ'}
-coll.delete('tj') # True
+coll.create_or_overwrite_doc('tj', {'name': 'TJ'}) # True
+coll.read_doc('tj') # {'name': 'TJ'}
+coll.force_delete_doc('tj') # True
 
 # non-expiring
-coll.replace('tj', {'name': 'TJ'}, ttl=None)
-coll.delete('tj')
+coll.create_or_overwrite_doc('tj', {'name': 'TJ'}, ttl=None)
+coll.force_delete_doc('tj')
 
-# custom expirations with touching
-coll.replace('tj', {'name': 'TJ'}, ttl=60)
-coll.touch('tj', ttl=60)
+# custom expirations with touching. Note that touching a document is not
+# a supported atomic operation on ArangoDB and is hence faked with
+# read -> compare_and_swap. Presumably if the CAS fails the document was
+# touched recently anyway.
+coll.create_or_overwrite_doc('tj', {'name': 'TJ'}, ttl=30) # True
+coll.touch_doc('tj', ttl=60) # True
 
-# Alternative interface.
+# Alternative interface. For anything except one-liners, usually nicer.
 doc = coll.document('tj')
 doc.body['name'] = 'TJ'
-doc.replace() # True
+doc.create() # True
 doc.body['note'] = 'Pretty cool'
-doc.replace() # True
+doc.compare_and_swap() # True
+doc.compare_and_delete() # True
 
 # We may use etags to avoid redownloading an unchanged document, but be careful
 # if you are modifying the body.
 
 # Happy case:
 doc2 = coll.document('tj')
-doc2.read(try_304=True) # loads {'name': 'TJ', 'note': 'Pretty cool'} from network
+doc2.read() # loads {'name': 'TJ', 'note': 'Pretty cool'} from network
 
-doc.read(try_304=True) # 304 not modified
-doc2.read(try_304=True) # 304 not modified
+doc.read_if_remote_newer() # 304 not modified, returns False
+doc2.read_if_remote_newer() # 304 not modified, returns False
 
 doc.body['note'] = 'bar'
-doc.replace()
-doc.read(try_304=True) # 304 not modified
-doc2.read(try_304=True) # loads {'name': 'TJ', 'note': 'bar'} from network
+doc.compare_and_swap()
+doc.read_if_remote_newer() # 304 not modified, returns False
+doc2.read_if_remote_newer() # loads {'name': 'TJ', 'note': 'bar'} from network, returns True
 
 # Where it can get dangerous
 doc.body['note'] = 'foo'
 print(doc.body) # {'name': 'TJ', 'note': 'foo'}
 doc.read() # always a complete download
 print(doc.body) # {'name': 'TJ', 'note': 'bar'}
-doc.read(try_304=True) # no changes on server since last read; 304 not modified
+doc.read_if_remote_newer() # no changes on server since last read; 304 not modified, returns False
 print(doc.body) # {'name': 'TJ', 'note': 'bar'}
 doc.body['note'] = 'foo'
 print(doc.body) # {'name': 'TJ', 'note': 'foo'}
-doc.read(try_304=True) # no changes on server since last read; 304 not modified
+doc.read_if_remote_newer() # no changes on server since last read; 304 not modified, returns False
 print(doc.body) # {'name': 'TJ', 'note': 'foo'}
 doc.read()
 print(doc.body) # {'name': 'TJ', 'note': bar'}
@@ -217,8 +238,25 @@ doc = coll.document('tj')
 if not doc.read():
     # .... expensive computation ....
     doc.body = {'name': 'TJ', 'note': 'Pretty cool'}
-    doc.replace()
+    doc.create_or_overwrite()
+else:
+    doc.compare_and_swap() # refreshes TTL, usefulness depends
+
 print(f'cached value: {doc.body}')
+```
+
+The following is in a separate code-block and is commented out to prevent
+accidentally copy+paste into somewhere it should not be pasted. When running
+tests it's helpful to cleanup the collections and databases afterward. It's
+encouraged that if you do not need to delete collections and databases on
+production these operations are disabled to help prevent developer error, which
+is done by setting `ARANGO_DISABLE_DATABASE_DELETE` and
+`ARANGO_DISABLE_COLLECTION_DELETE` to `true`. This is not a substitute for good
+backups and should not be considered a security feature.
+
+```py
+# coll.force_delete()
+# db.force_delete()
 ```
 
 ## Contributing
