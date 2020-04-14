@@ -236,15 +236,18 @@ doc.compare_and_delete() # True
 
 
 # Simple caching
-doc = coll.document('tj')
-if not doc.read():
-    # .... expensive computation ....
-    doc.body = {'name': 'TJ', 'note': 'Pretty cool'}
-    doc.create_or_overwrite()
-else:
-    doc.compare_and_swap() # refreshes TTL, usefulness depends
+for i in range(2):
+    doc = coll.document('tj')
+    if not doc.read():
+        # .... expensive computation ....
+        doc.body = {'name': 'TJ', 'note': 'Pretty cool'}
+        doc.create_or_overwrite()
+        hit = False
+    else:
+        doc.compare_and_swap() # refreshes TTL, usefulness depends
+        hit = True
 
-print(f'cached value: {doc.body}')
+    print(f'cached value (loop {i + 1}/2) (hit: {hit}): {doc.body}')
 ```
 
 The following is in a separate code-block and is commented out to prevent
