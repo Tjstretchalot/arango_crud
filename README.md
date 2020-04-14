@@ -13,12 +13,16 @@ The main reason to use pyArango over arango_crud is field validation and access
 to AQL. If you want to use ArangoDB as a database, use pyArango or similar. If
 you want to use ArangoDB as a disk-based cache, use arango_crud or similar.
 
-***Note***: All the examples in this package assume TTL is being used to cleanup
-keys eventually. The TTL may be set to "-1" in environment variables to be
-disabled, or "None" in code to be disabled. In this case some other solution for
-cleaning up old keys is required. A TTL index is only created when collections
-are initialized, so if this library is used with TTL disabled and then TTL is
-enabled, one must manually add the TTL indexes.
+***Note***: This package recommends a time-to-live semantic. The TTL may be
+set to "-1" in environment variables to be disabled, or "None" in code to be
+disabled. A TTL index is only created when collections are initialized, so if
+this library is used with TTL disabled and then TTL is enabled, one must
+manually add the TTL indexes. Besides standard TTL usages, using a TTL means
+that if there was a bug that leaked keys which was since patched, those keys
+won't stay around forever. Furthermore, it means a small amount of key leakage,
+such as through extremely unlikely race conditions which would be expensive
+in either performance or developer time to fix, is not harmful to the long-term
+health of the project.
 https://www.arangodb.com/arangodb-training-center/ttl-indexes/
 
 ***Note***: This is not intended to provide much configurability for creating
@@ -40,46 +44,42 @@ Supports python 3.7 or higher.
 #### Code-as-configuration BasicAuth
 
 ```py
-from arango_crud import Config, BasicAuth
+from arango_crud import (
+    Config, BasicAuth, RandomCluster, StepBackOffStrategy
+)
 
 config = Config(
-    cluster=['http://localhost:8529'],
-    ttl_seconds=31622400,
-    request_distribution='round-robin', # see Request Styles
+    cluster=RandomCluster(), # see Cluster Styles
+    back_off=StepBackOffStrategy([0.1, 0.5, 1, 1, 1]), # see Back Off Strategies
     auth=BasicAuth(username='root', password=''),
-    server_failures={ # see Server Failures
-        'strategy': 'step-back-off',
-        'steps': [0.1, 0.5, 1, 1, 1]
-    }
+    ttl_seconds=31622400
 )
 ```
 
 #### Code-as-configuration JWT
 
 ```py
-from arango_crud import Config, JWTAuth
+from arango_crud import (
+    Config, JWTAuth, JWTDiskCache, RandomCluster, StepBackOffStrategy
+)
 
 config = Config(
-    cluster=['http://localhost:8529'],
+    cluster=RandomCluster(urls=['http://localhost:8529']),
+    back_off=StepBackOffStrategy(steps=[0.1, 0.5, 1, 1, 1]),
     ttl_seconds=31622400,
-    request_style='round-robin', # see Request Styles
     auth=JWTAuth(
         username='root',
         password='',
-        lock_style='disk', # See JWT Locking and Store for remaining
-        lock_file='.arango_jwt.lock',
-        lock_time_seconds=10,
-        store_style='disk',
-        store_file='.arango_jwt'
-    ),
-    server_failures={ # see Server Failures
-        'strategy': 'step-back-off',
-        'steps': [0.1, 0.5, 1, 1, 1]
-    }
+        cache=JWTDiskCache( # See JWT Caches
+            lock_file='.arango_jwt.lock',
+            lock_time_seconds=10,
+            store_file='.arango_jwt'
+        )
+    )
 )
 
 # encouraged for easier performance tracing, not required. happens on first
-# request otherwise
+# request otherwise. Fetches the JWT token if it does not exist.
 config.prepare()
 ```
 
@@ -98,13 +98,13 @@ run.sh
 #!/usr/bin/env bash
 # Cluster urls are separated by a comma
 export ARANGO_CLUSTER=http://localhost:8529
+export ARANGO_CLUSTER_STYLE=random
+export ARANGO_BACK_OFF_STYLE=step
+export ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 export ARANGO_TTL_SECONDS=31622400
-export ARANGO_REQUEST_STYLE=round-robin
 export ARANGO_AUTH=basic
-export ARANGO_USERNAME=root
-export ARANGO_PASSWORD=
-export ARANGO_DISABLE_DATABASE_DELETE=false
-export ARANGO_DISABLE_COLLECTION_DELETE=false
+export ARANGO_AUTH_USERNAME=root
+export ARANGO_AUTH_PASSWORD=
 python test.py
 ```
 
@@ -122,15 +122,17 @@ run.sh
 #!/usr/bin/env bash
 # Cluster urls are separated by a comma
 export ARANGO_CLUSTER=http://localhost:8529
+export ARANGO_CLUSTER_STYLE=random
+export ARANGO_BACK_OFF_STYLE=step
+export ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 export ARANGO_TTL_SECONDS=31622400
-export ARANGO_REQUEST_STYLE=round-robin
 export ARANGO_AUTH=jwt
-export ARANGO_AUTH_LOCK=mutex
-export ARANGO_AUTH_STORE=disk
-export ARANGO_USERNAME=root
-export ARANGO_PASSWORD=
-export ARANGO_DISABLE_DATABASE_DELETE=false
-export ARANGO_DISABLE_COLLECTION_DELETE=false
+export ARANGO_AUTH_CACHE=disk
+export ARANGO_AUTH_CACHE_LOCK_FILE=.arango_jwt.lock
+export ARANGO_AUTH_CACHE_LOCK_TIME_SECONDS=10
+export ARANGO_AUTH_CACHE_STORE_FILE=.arango_jwt
+export ARANGO_AUTH_USERNAME=root
+export ARANGO_AUTH_PASSWORD=
 python test.py
 ```
 
@@ -142,29 +144,28 @@ needs to be reachable. Here are the configurations for ArangoDB running
 locally on default development settings:
 
 Windows:
-```cmd
+```bat
 SET ARANGO_CLUSTER=http://localhost:8529
+SET ARANGO_CLUSTER_STYLE=random
+SET ARANGO_BACK_OFF_STYLE=step
+SET ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 SET ARANGO_TTL_SECONDS=31622400
-SET ARANGO_REQUEST_STYLE=round-robin
 SET ARANGO_AUTH=basic
-SET ARANGO_USERNAME=root
-SET ARANGO_DEFAULT_DATABASE=test_db
-SET ARANGO_DISABLE_DATABASE_DELETE=false
-SET ARANGO_DISABLE_COLLECTION_DELETE=false
+SET ARANGO_AUTH_USERNAME=root
+SET ARANGO_AUTH_PASSWORD=
 ```
 
 *Nix:
 ```sh
 #!/usr/bin/env bash
 export ARANGO_CLUSTER=http://localhost:8529
+export ARANGO_CLUSTER_STYLE=random
+export ARANGO_BACK_OFF_STYLE=step
+export ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 export ARANGO_TTL_SECONDS=31622400
-export ARANGO_REQUEST_STYLE=round-robin
 export ARANGO_AUTH=basic
-export ARANGO_USERNAME=root
-export ARANGO_PASSWORD=
-export ARANGO_DEFAULT_DATABASE=test_db
-export ARANGO_DISABLE_DATABASE_DELETE=false
-export ARANGO_DISABLE_COLLECTION_DELETE=false
+export ARANGO_AUTH_USERNAME=root
+export ARANGO_AUTH_PASSWORD=
 ```
 
 ```py
@@ -174,7 +175,7 @@ import time
 config = env_config()
 config.prepare()
 
-db = config.database() # alt: config.database('my_db')
+db = config.database('my_db')
 db.create_if_not_exists()
 coll = db.collection('users')
 coll.create_if_not_exists()
@@ -251,8 +252,9 @@ tests it's helpful to cleanup the collections and databases afterward. It's
 encouraged that if you do not need to delete collections and databases on
 production these operations are disabled to help prevent developer error, which
 is done by setting `ARANGO_DISABLE_DATABASE_DELETE` and
-`ARANGO_DISABLE_COLLECTION_DELETE` to `true`. This is not a substitute for good
-backups and should not be considered a security feature.
+`ARANGO_DISABLE_COLLECTION_DELETE` to `true` These environment variables are
+treated as `true` unless explicitly set to `false`. This is not a substitute
+for good backups and should not be considered a security feature.
 
 ```py
 # coll.force_delete()
@@ -292,6 +294,10 @@ This repository is focused specifically on using ArangoDB as a disk-based
 cache. Functionality which doesn't support that use-case will have their PR
 closed with the recommendation that they fork.
 
+Inheritance is to be avoided, preferring delegation which respects contracts.
+Interfaces are not included in this, where an interface is a class where all
+the functions simply raise `NotImplementedError` and there is no constructor.
+
 ### Setup Development (Windows)
 
 [Install ArangoDB](https://www.arangodb.com/download-major/) on default
@@ -325,18 +331,48 @@ coverage run --source=examples examples/run_all.py
 coverage report
 ```
 
-## Request Styles
+## Cluster Styles
 
 When working with an ArangoDB cluster, it's important that the clients
-distribute their requests amongst the various coordinators. This is why the
-IP address of the coordinators is a list of addresses. The request styles
-supported are `round-robin`, `weighted-round-robin`, and `random`
-
-### Round Robin
-
-### Weighted Round Robin
+distribute their requests amongst the various coordinators. The request
+styles supported are `random` and `weighted-random`. Round-robin and
+similar are avoided as they cannot be made thread-safe and performant
+without context.
 
 ### Random
+
+A random url is selected from the cluster for each request with equal
+probability among all urls.
+
+### Weighted Random
+
+A random node in the cluster is selected on each request, except there may be
+a different probability for different urls. This is useful if, for example,
+one of the coordinators is running on a larger server than the rest.
+
+Example:
+
+```py
+from arango_crud import WeightedRandomCluster
+
+cluster = WeightedRandomCluster(
+    urls=['http://localhost:8529', 'http://localhost:8530', 'http://localhost:8531'],
+    weights=[1, 2, 1]
+)
+```
+
+This will select port 8529 1/4 of the time, 8530 1/2 of the time, and 8531 1/4
+of the time. If one prefers to set the exact percentages just ensure the
+weights sum to one (i.e., `0.25, 0.5, 0.25`)
+
+Example environment variables:
+
+```sh
+#!/usr/bin/env bash
+export ARANGO_CLUSTER=http://localhost:8529,http://localhost:8530,http://localhost:8531
+export ARANGO_CLUSTER_STYLE=weighted-random
+export ARANGO_CLUSTER_WEIGHTS=1,2,1
+```
 
 ## Server Failures
 
