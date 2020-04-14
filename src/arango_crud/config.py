@@ -19,6 +19,9 @@ class Config:
         auth (Auth): Sets authentication headers.
     """
     def __init__(self, cluster, back_off, ttl_seconds, auth):
+        """Initializes Config by setting the corresponding attributes. For
+        auth if it is a StatefulAuth it is wrapped with a StatefulAuthWrapper.
+        """
         pass
 
     def database(self, name):
