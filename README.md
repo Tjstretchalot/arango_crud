@@ -392,7 +392,7 @@ be secure. Hence JWT is necessarily stateful on the Config - rather than just
 being able to create network requests we first need to fetch the JWT.
 Furthermore, we may need to refresh the token on arbitrary requests.
 
-The recommended way to handle JWT's is the `'disk'` style. A file will contain
+The recommended way to handle JWT's cache is `JWTDiskCache`. A file will contain
 the JWT and some metadata about it, which will be accessed in a safe way for
 even highly concurrent environments, meaning that every instance running
 arango_crud on the same machine using the same config will share JWT tokens
@@ -401,5 +401,5 @@ extremely minor for non-concurrent environments.
 
 If you're very confident that JWT generation is not going to be a significant
 source of load and there is no multithreading, a naive approach can be enabled
-with the lock and store style `None`. See the examples jwt_disk_example.py
-and jwt_none_example.py
+with the cache style `None`. See the examples jwt_disk_example.py and
+jwt_none_example.py
