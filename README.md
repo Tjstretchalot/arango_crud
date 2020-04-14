@@ -202,7 +202,6 @@ doc.body['name'] = 'TJ'
 doc.create() # True
 doc.body['note'] = 'Pretty cool'
 doc.compare_and_swap() # True
-doc.compare_and_delete() # True
 
 # We may use etags to avoid redownloading an unchanged document, but be careful
 # if you are modifying the body.
@@ -232,6 +231,8 @@ doc.read_if_remote_newer() # no changes on server since last read; 304 not modif
 print(doc.body) # {'name': 'TJ', 'note': 'foo'}
 doc.read()
 print(doc.body) # {'name': 'TJ', 'note': bar'}
+
+doc.compare_and_delete() # True
 
 
 # Simple caching
