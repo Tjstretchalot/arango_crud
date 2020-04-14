@@ -238,14 +238,13 @@ doc.compare_and_delete() # True
 # Simple caching
 for i in range(2):
     doc = coll.document('tj')
-    if not doc.read():
+    hit = doc.read()
+    if hit:
+        doc.compare_and_swap() # refreshes TTL, usefulness depends
+    else:
         # .... expensive computation ....
         doc.body = {'name': 'TJ', 'note': 'Pretty cool'}
         doc.create_or_overwrite()
-        hit = False
-    else:
-        doc.compare_and_swap() # refreshes TTL, usefulness depends
-        hit = True
 
     print(f'cached value (loop {i + 1}/2) (hit: {hit}): {doc.body}')
 ```
