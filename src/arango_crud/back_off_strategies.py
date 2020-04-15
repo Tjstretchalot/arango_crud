@@ -2,8 +2,31 @@
 issues and provides a concrete implementation."""
 
 class BackOffStrategy:
-    pass
+    """Describes the interface for backing off from a cluster. These instances
+    must be stateless or detect multi-threading / forking"""
+    def get_back_off(self, num_failed_requests):
+        """Returns how much to back off from the server if we have failed the
+        given number of requests due to server or network issues so far for
+        this request.
+
+        Returns:
+            Either a float which is the number of seconds to sleep before
+            attempting the request again or None to raise an error.
+        """
+        raise NotImplementedError
 
 
 class StepBackOffStrategy(BackOffStrategy):
-    pass
+    """Describes an extremely easy to understand approach - a direct mapping
+    between the number of failed requests and a time to sleep. Once we exhaust
+    the mapping we return None, which raises an error.
+
+    Attributes:
+        steps (list[float]): At index 0 is the back-off for 1 failed request,
+            etc. If this has 2 elements, there will be 3 retries.
+    """
+    def __init__(self, steps):
+        pass
+
+    def get_back_off(self, num_failed_requests):
+        pass

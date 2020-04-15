@@ -163,4 +163,45 @@ class JWTDiskCache(JWTCache):
 
 
 class JWTAuth(StatefulAuth):
-    pass
+    """Uses a username and password authentication to acquire a JWT which is
+    used for future requests. A JWT can be more performant than basic auth.
+
+    Attributes:
+        username (str): The username to authenticate with
+        password (str): The password to authenticate with
+        cache (JWTCache, None): The mechanism for caching the token, or None
+            to cache in memory only
+
+        _token (JWTToken, None): The current token we are authenticating with,
+            if we have a token.
+    """
+    def __init__(username, password, cache):
+        """Initializes authorization to use the given cache in the future. Does
+        not actually attempt to use the cache or initialize the token yet; that
+        will be done on the next prepare or authorize.
+        """
+        pass
+
+    def prepare(self):
+        """If this has no token in memory it will attempt to acquire one (first
+        through the cache and then through networking). If it has a token it
+        will consider refreshing it."""
+        pass
+
+    def try_recover_auth_failure(self):
+        """If this has an active token it will be cleared and this will return
+        True. Otherwise this will return False."""
+        pass
+
+    def authorize(self, headers):
+        """Will attempt to ensure an active token. If this cannot acquire a
+        token, typically due to locking issues, an error will be raised.
+        Otherwise, the 'Authentication' header will be set in the dict of
+        headers to authenticate with the JWT"""
+        pass
+
+    def copy_and_strip_state(self):
+        """Returns a new JWTAuth instance which is exactly how this one was
+        constructed. This must be called if the process is forked or this is
+        accessed in a different thread."""
+        pass

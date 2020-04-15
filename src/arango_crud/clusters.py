@@ -3,18 +3,48 @@ well as various common concrete implementations.
 """
 
 class Cluster:
-    pass
+    """Describes the interface for a cluster. This is something which is
+    capable of selecting a URL to direct requests to. Cluster instances
+    should be stateless."""
+    def select_next_url(self):
+        """Returns the URL to a coordinator in the cluster which the next
+        request will be sent to.
+
+        Returns:
+            The str url to a coordinator not suffixed with a slash. For
+            example: http://localhost:5289
+        """
+        raise NotImplementedError
 
 
-class WeightedRoundRobinCluster(Cluster):
-    pass
+class WeightedRandomCluster(Cluster):
+    """Describes a cluster where requests are distributed at random according
+    to the given set of probabilities.
 
+    Attributes:
+        urls (list[str]): A list of urls for coordinators within the cluster
+        weights (list[float]): A list of positive floats that corresponds to
+            the weight of the corresponding index in urls. If url A and B are
+            such that A has 2x the weight of B, A will receive 2x the requests
+            of B.
+    """
+    def __init__(self, urls, weights):
+        pass
 
-class RoundRobinCluster(Cluster):
-    """A special case of a weighted round robin cluster where all the weights
-    are 1."""
-    pass
+    def select_next_url(self):
+        pass
 
 
 class RandomCluster(Cluster):
-    pass
+    """A special case of a weighted random cluster where all the urls have the
+    same weight. Distributes requests uniformly at random to coordinators in
+    the cluster.
+
+    Attributes:
+        urls (list[str]): A list of urls for coordinators within the cluster
+    """
+    def __init__(self, urls):
+        pass
+
+    def select_next_url(self):
+        pass
