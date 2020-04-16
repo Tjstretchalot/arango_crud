@@ -76,8 +76,10 @@ def env_config(cfg=None):
             ARANGO_AUTH (str): A string as an enum. One of 'basic', 'jwt'.
                 Always requires the following arguments:
 
-                ARANGO_AUTH_USERNAME (str):
-                ARANGO_AUTH_PASSWORD (str, None):
+                ARANGO_AUTH_USERNAME (str): The username to authenticate with.
+                ARANGO_AUTH_PASSWORD (str, None): The password to authenticate
+                    with; treats None as an empty string, which works better in
+                    some shells when using environment variables.
 
                 With the following additional arguments by choice:
 
