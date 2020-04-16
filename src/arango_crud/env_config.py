@@ -87,10 +87,10 @@ def env_config(cfg=None):
                 'jwt': Converts the username and password to a JWT for most
                     requests. The conversion to a JWT is usually a performance
                     gain, as long as the JWT is not generated frequently. See
-                    the README "JWT Locking and Store" for details, but in
-                    general just choose cache 'disk', lock file
-                    '.arango_jwt.lock', lock time seconds '10', and cache store
-                    file '.arango_jwt'.
+                    the README "JWT Locking and Store" for details. 99% of the
+                    time the best implemented choice is ARANGO_AUTH='jwt',
+                    ARANGO_AUTH_CACHE='disk', and the remaining auth settings
+                    on their default values.
 
                     ARANGO_AUTH_CACHE (str): A string as enum. The cache style
                         to use for the JWT in a addition to storing it memory.
