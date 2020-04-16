@@ -103,7 +103,7 @@ def env_config(cfg=None):
                         spiking. Additional arguments by choice:
 
                         'none': JWT's are only reused if the same Config
-                            instance is used for both calls. No additonal
+                            instance is used for both calls. No additional
                             arguments.
                         'disk': JWT's are stored on disk, allowing all Config
                             instances which are initialized with the same file
