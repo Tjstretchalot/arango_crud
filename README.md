@@ -50,6 +50,7 @@ from arango_crud import (
 
 config = Config(
     cluster=RandomCluster(), # see Cluster Styles
+    timeout_seconds=3,
     back_off=StepBackOffStrategy([0.1, 0.5, 1, 1, 1]), # see Back Off Strategies
     auth=BasicAuth(username='root', password=''),
     ttl_seconds=31622400
@@ -65,6 +66,7 @@ from arango_crud import (
 
 config = Config(
     cluster=RandomCluster(urls=['http://localhost:8529']),
+    timeout_seconds=3,
     back_off=StepBackOffStrategy(steps=[0.1, 0.5, 1, 1, 1]),
     ttl_seconds=31622400,
     auth=JWTAuth(
@@ -99,7 +101,8 @@ run.sh
 # Cluster urls are separated by a comma
 export ARANGO_CLUSTER=http://localhost:8529
 export ARANGO_CLUSTER_STYLE=random
-export ARANGO_BACK_OFF_STYLE=step
+export ARANGO_TIMEOUT_SECONDS=3
+export ARANGO_BACK_OFF=step
 export ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 export ARANGO_TTL_SECONDS=31622400
 export ARANGO_AUTH=basic
@@ -123,7 +126,8 @@ run.sh
 # Cluster urls are separated by a comma
 export ARANGO_CLUSTER=http://localhost:8529
 export ARANGO_CLUSTER_STYLE=random
-export ARANGO_BACK_OFF_STYLE=step
+export ARANGO_TIMEOUT_SECONDS=3
+export ARANGO_BACK_OFF=step
 export ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 export ARANGO_TTL_SECONDS=31622400
 export ARANGO_AUTH=jwt
@@ -147,7 +151,8 @@ Windows:
 ```bat
 SET ARANGO_CLUSTER=http://localhost:8529
 SET ARANGO_CLUSTER_STYLE=random
-SET ARANGO_BACK_OFF_STYLE=step
+SET ARANGO_TIMEOUT_SECONDS=3
+SET ARANGO_BACK_OFF=step
 SET ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 SET ARANGO_TTL_SECONDS=31622400
 SET ARANGO_AUTH=basic
@@ -160,7 +165,8 @@ SET ARANGO_AUTH_PASSWORD=
 #!/usr/bin/env bash
 export ARANGO_CLUSTER=http://localhost:8529
 export ARANGO_CLUSTER_STYLE=random
-export ARANGO_BACK_OFF_STYLE=step
+export ARANGO_TIMEOUT_SECONDS=3
+export ARANGO_BACK_OFF=step
 export ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 export ARANGO_TTL_SECONDS=31622400
 export ARANGO_AUTH=basic
@@ -376,6 +382,43 @@ export ARANGO_CLUSTER=http://localhost:8529,http://localhost:8530,http://localho
 export ARANGO_CLUSTER_STYLE=weighted-random
 export ARANGO_CLUSTER_WEIGHTS=1,2,1
 ```
+
+## Alternatives to Environment Variables
+
+Although environment variables are sometimes extremely convenient, they can
+also be painful in other development environments. One can painlessly switch
+these out for their preferred storage mechanism since `env_config` accepts
+a dictionary which it uses to load variables from. Note that `env_config`
+will exclusively use that dictionary - it will not fall back and use an
+environment variable if something is missing.
+
+The only caveat is that for simplicity of development and to reuse the same
+documentation, the keys need to be screaming snake case and it will not
+make use of nesting. If one prefers they can massage the data into this format
+after loading to get more conventional looking configuration files. One can
+also simply massage the data into the arguments for `Config` directly.
+
+arango_config.json
+```json
+{
+    "ARANGO_CLUSTER": "http://localhost:8529,http://localhost:8530,http://localhost:8531",
+    "ARANGO_CLUSTER_STYLE": "weighted-random",
+    /* others omitted... */
+}
+```
+
+Which allows loading as follows:
+
+```py
+from arango_crud import env_config
+import json
+
+with open('arango_config.json') as fin:
+    cfg = json.load(fin)
+
+arango_config = env_config(cfg)
+```
+
 
 ## Server Failures
 

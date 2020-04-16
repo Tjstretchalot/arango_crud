@@ -9,6 +9,8 @@ class Config:
 
     Attributes:
         cluster (Cluster): Decides which URL requests go to.
+        timeout_seconds (float): The timeout for requests to the cluster,
+            https://requests.readthedocs.io/en/master/user/quickstart/#timeouts
         back_off (BackOffStrategy): Decides what to do if a server or network
             error occurs.
         ttl_seconds (int, None): The number of seconds by default that objects
@@ -18,7 +20,7 @@ class Config:
             not-None.
         auth (Auth): Sets authentication headers.
     """
-    def __init__(self, cluster, back_off, ttl_seconds, auth):
+    def __init__(self, cluster, timeout_seconds, back_off, ttl_seconds, auth):
         """Initializes Config by setting the corresponding attributes. For
         auth if it is a StatefulAuth it is wrapped with a StatefulAuthWrapper.
         """
