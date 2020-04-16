@@ -90,7 +90,10 @@ def env_config(cfg=None):
                     the README "JWT Locking and Store" for details. 99% of the
                     time the best implemented choice is ARANGO_AUTH='jwt',
                     ARANGO_AUTH_CACHE='disk', and the remaining auth settings
-                    on their default values.
+                    on their default values. The most common thing to change
+                    is where the files are if the application doesn't have
+                    permission to modify the current working directory or the
+                    current working directory is not consistent.
 
                     ARANGO_AUTH_CACHE (str): A string as enum. The cache style
                         to use for the JWT in a addition to storing it memory.
