@@ -403,7 +403,7 @@ arango_config.json
 {
     "ARANGO_CLUSTER": "http://localhost:8529,http://localhost:8530,http://localhost:8531",
     "ARANGO_CLUSTER_STYLE": "weighted-random",
-    /* others omitted... */
+    "__comment": "... see src/arango_crud/env_config.py for complete argument docs ..."
 }
 ```
 
