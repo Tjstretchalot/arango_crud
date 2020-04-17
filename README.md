@@ -49,9 +49,9 @@ from arango_crud import (
 )
 
 config = Config(
-    cluster=RandomCluster(), # see Cluster Styles
+    cluster=RandomCluster(),  # see Cluster Styles
     timeout_seconds=3,
-    back_off=StepBackOffStrategy([0.1, 0.5, 1, 1, 1]), # see Back Off Strategies
+    back_off=StepBackOffStrategy([0.1, 0.5, 1, 1, 1]),  # see Back Off Strategies
     auth=BasicAuth(username='root', password=''),
     ttl_seconds=31622400
 )
@@ -72,7 +72,7 @@ config = Config(
     auth=JWTAuth(
         username='root',
         password='',
-        cache=JWTDiskCache( # See JWT Caches
+        cache=JWTDiskCache(  # See JWT Caches
             lock_file='.arango_jwt.lock',
             lock_time_seconds=10,
             store_file='.arango_jwt'
@@ -131,12 +131,12 @@ export ARANGO_BACK_OFF=step
 export ARANGO_BACK_OFF_STEPS=0.1,0.5,1,1,1
 export ARANGO_TTL_SECONDS=31622400
 export ARANGO_AUTH=jwt
+export ARANGO_AUTH_USERNAME=root
+export ARANGO_AUTH_PASSWORD=
 export ARANGO_AUTH_CACHE=disk
 export ARANGO_AUTH_CACHE_LOCK_FILE=.arango_jwt.lock
 export ARANGO_AUTH_CACHE_LOCK_TIME_SECONDS=10
 export ARANGO_AUTH_CACHE_STORE_FILE=.arango_jwt
-export ARANGO_AUTH_USERNAME=root
-export ARANGO_AUTH_PASSWORD=
 python test.py
 ```
 
@@ -187,7 +187,7 @@ coll = db.collection('users')
 coll.create_if_not_exists()
 
 # The simplest interface
-coll.create_or_overwrite_doc('tj', {'name': 'TJ'}) # True
+coll.create_or_overwrite_doc('tj', {'name': 'TJ'})
 coll.read_doc('tj') # {'name': 'TJ'}
 coll.force_delete_doc('tj') # True
 
@@ -236,7 +236,7 @@ print(doc.body) # {'name': 'TJ', 'note': 'foo'}
 doc.read_if_remote_newer() # no changes on server since last read; 304 not modified, returns False
 print(doc.body) # {'name': 'TJ', 'note': 'foo'}
 doc.read()
-print(doc.body) # {'name': 'TJ', 'note': bar'}
+print(doc.body) # {'name': 'TJ', 'note': 'bar'}
 
 doc.compare_and_delete() # True
 
@@ -275,9 +275,13 @@ for good backups and should not be considered a security feature.
 This package adheres to pep8 guidelines unless an exception is listed in
 `.flake8`. Comments are explicitly line-broken at 80 characters. Code
 complexity measures (AbcComplexity, etc) are not used. This measures code
-coverage and a build of below 90% code coverage is considered failing. PRs
-which reduce code coverage must include an explanation of why. The examples
-directory should not contain non-functional lines of code, so instead of
+coverage and a build of below 70% code coverage is considered failing. Note
+that the word "unit test" is avoided - if it's possible to test a line of
+code without mocking or accessing private variables that is preferred. PRs
+which reduce code coverage must include an explanation of why.
+
+The examples directory should not contain non-functional lines of code, so
+instead of
 
 ```py
 bar = foo()
@@ -301,7 +305,9 @@ changes requested.
 
 This repository is focused specifically on using ArangoDB as a disk-based
 cache. Functionality which doesn't support that use-case will have their PR
-closed with the recommendation that they fork.
+closed with the recommendation that they fork. So AQL or graph support would
+likely be closed, but (bulk) get/set operations or concurrency-safe patches
+will likely be merged.
 
 Inheritance is to be avoided, preferring delegation which respects contracts.
 Interfaces are not included in this, where an interface is a class where all

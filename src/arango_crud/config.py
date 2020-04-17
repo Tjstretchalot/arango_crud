@@ -19,8 +19,21 @@ class Config:
             so manual intervention is required to change this from None to
             not-None.
         auth (Auth): Sets authentication headers.
+        disable_database_delete (bool): True if database deletes are prevented,
+            False if database deletes are allowed.
+        protected_databases (list[str]): A list of database names which are
+            prevented from deletion. Only has an effect if
+            disable_database_delete is False.
+        disable_collection_delete (bool): True if collection deletes are
+            prevented, False if collection deletes are allowed.
+        protected_collections (list[str]): A list collection names which are
+            prevented from deletion. Only has an effect if
+            disable_collection_delete is False.
     """
-    def __init__(self, cluster, timeout_seconds, back_off, ttl_seconds, auth):
+    def __init__(
+            self, cluster, timeout_seconds, back_off, ttl_seconds, auth,
+            disable_database_delete=False, protected_databases=None,
+            disable_collection_delete=False, protected_collections=None):
         """Initializes Config by setting the corresponding attributes. For
         auth if it is a StatefulAuth it is wrapped with a StatefulAuthWrapper.
         """

@@ -46,19 +46,21 @@ def env_config(cfg=None):
                 should be closer to 20 seconds as it takes longer to feel
                 confident it's a connectivity issue.
 
-            ARANGO_BACK_OFF (str): A string as an enum. Always 'step'.
-                Additional arguments by choice:
+            ARANGO_BACK_OFF (str, None): A string as an enum. Always 'step'.
+                None is treated as 'step'. Additional arguments by choice:
 
                 'step': Back-off occurs on a fixed schedule with a fixed upper
                     limit on the number of retries.
 
-                    ARANGO_BACK_OFF_STEPS (str): A comma-separated list of
-                        floats. If this has 1 value then there will be one
+                    ARANGO_BACK_OFF_STEPS (str, None): A comma-separated list
+                        of floats. If this has 1 value then there will be one
                         additional request after the first failure, and it will
                         occur after sleeping the value in seconds. Ex:
                         0.1,0.5,1 will go failure -> 0.1 second sleep ->
                         failure, 0.5 second sleep -> failure -> 1 second sleep
                         -> error if there are network connectivity issues.
+
+                        Defaults to 0.1,0.5,1,1,1
 
             ARANGO_TTL_SECONDS (str, None): Either an integer in base-10 format
                 for the time after which objects may be deleted arbitrarily if
@@ -131,6 +133,29 @@ def env_config(cfg=None):
                                 Note this only needs to be accessed when
                                 initializing, acquiring, or refreshing the JWT
                                 which lasts 1 month. Defaults to '.arango_jwt'
+
+            ARANGO_DISABLE_DATABASE_DELETE (str, None): Either the string
+                'false' to allow database deletes using arango_crud, otherwise
+                treated as True and will raise an AssertionError if a database
+                delete is attempted via arango_crud
+
+            ARANGO_PROTECTED_DATABASES (str, None): If
+                ARANGO_DISABLE_DATABASE_DELETE is not 'false' this is ignored.
+                Otherwise, this may be a comma separated list of database names
+                which will cause an AssertionError if a database delete is
+                attempted on them via arango_crud.
+
+            ARANGO_DISABLE_COLLECTION_DELETE (str, None): Either the string
+                'false' to allow database deletes using arango_crud, otherwise
+                treated as True and will raise an AssertionError if a
+                collection delete is attempted via arango_crud
+
+            ARANGO_PROTECTED_COLLECTIONS (str, None): If
+                ARANGO_DISABLE_COLLECTION_DELETE is not 'false' this is
+                ignored. Otherwise, this may be a comma separated list of
+                collection names which will cause an AssertionError if a
+                collection delete is attempted on them in any database via
+                arango_crud.
 
     Returns:
         An Arango Config instance initialized using the values in the config.

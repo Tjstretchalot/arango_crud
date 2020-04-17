@@ -45,6 +45,9 @@ class BasicAuth(Auth):
         username (str): The username to authenticate with
         password (str): The password to authenticate with
     """
+    def __init__(self, username, password):
+        pass
+
     def prepare(self):
         """Unused"""
         pass
@@ -158,7 +161,21 @@ class JWTDiskCache(JWTCache):
     """A disk-based JWT cache which will allow all processes or threads
     pointing at the same token and lock-file to share a JWT token. This is
     fairly simple and good enough for the great majority of use-cases.
+
+    Attributes:
+        lock_file (str): The path to the file to use for locking. Will be
+            formatted as url-safe UUID followed by a space and then a
+            float seconds since MS when the lock request occurred. An atomic
+            append occurs and then we look back to verify we weren't beat to
+            the lock. Depends on everyone using the lock file doing the same
+            thing.
+        lock_time_seconds (float): How long we respect locks for. If someone
+            has held the lock for this long we consider it safe to steal.
+        store_file (str): The path to the file used to store the actual JWT
+            alongside some meta info. Stored in json.
     """
+    def __init__(self, lock_file, lock_time_seconds, store_file):
+        pass
     pass
 
 

@@ -11,7 +11,7 @@ class Test(unittest.TestCase):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         for curdir, _, files in os.walk(dir_path):
             for f in files:
-                if f.endswith('.py'):
+                if f.startswith('test') and f.endswith('.py'):
                     fullpath = os.path.join(curdir, f)
                     relpath = fullpath[len(dir_path) + len(os.path.sep):-3]
                     mod_nm = '.'.join(relpath.split(os.path.sep))
