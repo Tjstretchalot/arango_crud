@@ -154,9 +154,9 @@ class Test(unittest.TestCase):
         self.assertEqual(doc.body, {'foo': 'baz'})
 
         doc2 = coll.document('test_doc')
-        doc.body['bar'] = 'foo'
-        self.assertTrue(doc.overwrite())
-        self.assertEqual(doc.body, {'bar': 'foo'})
+        doc2.body['bar'] = 'foo'
+        self.assertTrue(doc2.overwrite())
+        self.assertEqual(doc2.body, {'bar': 'foo'})
         self.assertTrue(doc.read())
         self.assertEqual(doc.body, {'bar': 'foo'})
 

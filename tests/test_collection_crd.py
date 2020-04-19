@@ -11,6 +11,7 @@ from arango_crud import (  # noqa: E402
     BasicAuth
 )
 
+
 class Test(unittest.TestCase):
     def test_create_read_delete(self):
         cfg = Config(
