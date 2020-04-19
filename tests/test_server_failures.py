@@ -17,7 +17,7 @@ class Test(unittest.TestCase):
                 strat.get_back_off(idx + 1),
                 step
             )
-        self.assertIsNone(StepBackOffStrategy.get_back_off(len(steps) + 1))
+        self.assertIsNone(strat.get_back_off(len(steps) + 1))
 
 
 if __name__ == '__main__':
