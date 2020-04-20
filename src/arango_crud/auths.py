@@ -1,6 +1,7 @@
 """Describes authorization strategies and provides concrete implementations.
 """
 from dataclasses import dataclass
+import pytypeutils as tus
 
 
 class Auth:
@@ -46,7 +47,12 @@ class BasicAuth(Auth):
         password (str): The password to authenticate with
     """
     def __init__(self, username, password):
-        pass
+        tus.check(
+            username=(username, str),
+            password=(password, str)
+        )
+        self.username = username
+        self.password = password
 
     def prepare(self):
         """Unused"""
@@ -93,7 +99,8 @@ class StatefulAuthWrapper(Auth):
         tid (int): The TID of the current thread.
     """
     def __init__(self, delegate):
-        pass
+        self.delegate = delegate
+        # TODO
 
     def prepare(self):
         """Verify PID and TID then delegate"""
@@ -175,8 +182,11 @@ class JWTDiskCache(JWTCache):
             alongside some meta info. Stored in json.
     """
     def __init__(self, lock_file, lock_time_seconds, store_file):
-        pass
-    pass
+        self.lock_file = lock_file
+        self.lock_time_seconds = lock_time_seconds
+        self.store_file = store_file
+
+    # TODO
 
 
 class JWTAuth(StatefulAuth):
@@ -192,12 +202,15 @@ class JWTAuth(StatefulAuth):
         _token (JWTToken, None): The current token we are authenticating with,
             if we have a token.
     """
-    def __init__(username, password, cache):
+    def __init__(self, username, password, cache):
         """Initializes authorization to use the given cache in the future. Does
         not actually attempt to use the cache or initialize the token yet; that
         will be done on the next prepare or authorize.
         """
-        pass
+        self.username = username
+        self.password = password
+        self.cache = cache
+        self._token = None
 
     def prepare(self):
         """If this has no token in memory it will attempt to acquire one (first

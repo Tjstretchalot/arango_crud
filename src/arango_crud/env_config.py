@@ -2,10 +2,18 @@
 using an ultra simple flat dictionary, which defaults to screaming snake case.
 This provides reasonably informative error messages and warnings as well.
 """
+from .config import Config
+from .clusters import Cluster, RandomCluster, WeightedRandomCluster
+from .back_off_strategies import BackOffStrategy, StepBackOffStrategy
+from .auths import Auth, BasicAuth, JWTAuth, JWTDiskCache
+from urllib.parse import urlparse
+import warnings
+import typing
+
 
 def env_config(cfg=None):
     """Loads an arango Config instance based on the given dictionary. If the
-    dictionary is not provided, os.env is used instead.
+    dictionary is not provided, os.environ is used instead.
 
     Arguments:
         cfg (dict, None): Dictates how the cluster is setup. Has the following
@@ -160,4 +168,304 @@ def env_config(cfg=None):
     Returns:
         An Arango Config instance initialized using the values in the config.
     """
-    print('foo')
+    cluster = env_cluster(cfg)
+    timeout_seconds = env_timeout_seconds(cfg)
+    back_off = env_back_off(cfg)
+    ttl_seconds = env_ttl_seconds(cfg)
+    auth = env_auth(cfg, timeout_seconds)
+    disable_database_delete = env_disable_database_delete(cfg)
+    protected_databases = env_protected_databases(cfg)
+    disable_collection_delete = env_disable_collection_delete(cfg)
+    protected_collections = env_protected_collections(cfg)
+
+    return Config(
+        cluster, timeout_seconds, back_off, ttl_seconds, auth,
+        disable_database_delete=disable_database_delete,
+        protected_databases=protected_databases,
+        disable_collection_delete=disable_collection_delete,
+        protected_collections=protected_collections
+    )
+
+
+def env_cluster(cfg) -> Cluster:
+    """Parses a cluster from the given dictionary of string to string mappings.
+    See "env_config" for details on how this is parsed."""
+    urls_str = _get_with_error(
+        cfg,
+        'ARANGO_CLUSTER',
+        'Expected a comma-separated list of urls for coordinators'
+    )
+    urls = urls_str.split(',')
+    if not urls:
+        raise ValueError(
+            f'ARANGO_CLUSTER={urls_str} does not specify any urls'
+        )
+
+    for idx, url in enumerate(urls):
+        try:
+            urlparse(url)
+        except ValueError:
+            raise ValueError(
+                f'ARANGO_CLUSTER={urls_str} should be a comma-separated list '
+                + f'of urls. URL at index {idx} = {url} is malformed.'
+            )
+
+    style = cfg.get('ARANGO_CLUSTER_STYLE', 'random')
+    if style == '':
+        style = 'random'
+
+    if style == 'random':
+        return RandomCluster(urls)
+    elif style == 'weighted-random':
+        weights_str = _get_with_error(
+            cfg,
+            'ARANGO_CLUSTER_WEIGHTS',
+            'Expected a comma-separated list of floats for coordinator weights'
+        )
+        weights_str_list = weights_str.split(',')
+        if len(weights_str_list) != len(urls):
+            raise ValueError(
+                f'ARANGO_CLUSTER_WEIGHTS={weights_str} should have the same '
+                + f'number of elements as ARANGO_CLUSTER={urls_str}. Got '
+                + f'{len(weights_str_list)} weights and {len(urls)} '
+                + 'coordinators.'
+            )
+        for idx, weight in enumerate(weights_str_list):
+            try:
+                float(weight)
+            except ValueError:
+                raise ValueError(
+                    f'ARANGO_CLUSTER_WEIGHTS={weights_str} should be a comma-'
+                    + f'separated list of floats, but index {idx} = {weight} '
+                    + 'could not be interpreted as a float.'
+                )
+
+            if float(weight) < 0:
+                raise ValueError(
+                    f'ARANGO_CLUSTER_WEIGHTS={weights_str} at index {idx} is '
+                    + 'negative. Should be positive.'
+                )
+        weights = [float(weight) for weight in weights_str_list]
+        return WeightedRandomCluster(urls, weights)
+    else:
+        raise ValueError(
+            f'ARANGO_CLUSTER_STYLE={style} is not a recognized style.'
+        )
+
+
+def env_timeout_seconds(cfg) -> int:
+    """Get the number of seconds before timing out requests to the cluster.
+    See env_config for details on how this is parsed"""
+    timeout_seconds_str = cfg.get('ARANGO_TIMEOUT_SECONDS')
+    if timeout_seconds_str is None or timeout_seconds_str == '':
+        return 3
+
+    try:
+        timeout_seconds = int(timeout_seconds_str)
+    except ValueError:
+        raise ValueError(
+            f'ARANGO_TIMEOUT_SECONDS={timeout_seconds_str} should be an int '
+            + 'could not be interpreted as such.'
+        )
+
+    if timeout_seconds <= 0:
+        raise ValueError(
+            f'ARANGO_TIMEOUT_SECONDS={timeout_seconds_str} needs to be postive!'
+        )
+
+    return timeout_seconds
+
+
+def env_back_off(cfg) -> BackOffStrategy:
+    """Loads the back-off strategy from the given dict of strings to strings.
+    See "env_config" for implementation details."""
+    back_off = cfg.get('ARANGO_BACK_OFF')
+    if back_off is None or back_off == '':
+        back_off = 'step'
+
+    if back_off == 'step':
+        steps_str = cfg.get('ARANGO_BACK_OFF_STEPS')
+        if steps_str is None or steps_str == '':
+            steps_str = '0.1,0.5,1,1,1'
+
+        steps_str_spl = steps_str.split(',')
+        if not steps_str_spl:
+            raise ValueError(
+                f'ARANGO_BACK_OFF_STEPS={steps_str} must be a non-empty list '
+                + 'of comma-separated floats!'
+            )
+
+        for idx, step in enumerate(steps_str_spl):
+            try:
+                float(step)
+            except ValueError:
+                raise ValueError(
+                    f'ARANGO_BACK_OFF_STEPS={steps_str} should be a comma-'
+                    + f'separated list of floats, but at index {idx} got '
+                    + f'{step} which could not be interpreted as a float'
+                )
+            if float(step) < 0:
+                raise ValueError(
+                    f'ARANGO_BACK_OFF_STEPS={steps_str} at index {idx} is '
+                    + 'negative, but every step must be non-negative!'
+                )
+
+        steps = [float(step) for step in steps_str_spl]
+        return StepBackOffStrategy(steps)
+    else:
+        raise ValueError(
+            f'ARANGO_BACK_OFF={back_off} should be \'step\''
+        )
+
+
+def env_ttl_seconds(cfg) -> int:
+    """Loads the default time-to-live for all documents from the given str to
+    str dict. See "env_config" for details."""
+    ttl_str = cfg.get('ARANGO_TTL_SECONDS')
+    if ttl_str is None or ttl_str == '':
+        return None
+
+    try:
+        ttl = int(ttl_str)
+    except ValueError:
+        raise ValueError(
+            f'Expected ARANGO_TTL_SECONDS={ttl_str} is an integer, but it could '
+            + 'not be parsed as such.'
+        )
+
+    if ttl <= 0:
+        raise ValueError(
+            f'ARANGO_TTL_SECONDS={ttl_str} must be a positive integer!'
+        )
+
+    return ttl
+
+
+def env_auth(cfg, timeout_seconds: int) -> Auth:
+    """Get the mechanism for authorizing requests to the cluster. See
+    "env_config" for details. Uses timeout_seconds for the default JWT
+    lock time and for warnings related to the JWT lock time.
+    """
+    style = cfg.get('ARANGO_AUTH')
+    if style is None or style == '':
+        raise ValueError(
+            f'ARANGO_AUTH is missing but is required.'
+        )
+
+    username = cfg.get('ARANGO_AUTH_USERNAME')
+    if username is None or username == '':
+        raise ValueError(
+            'ARANGO_AUTH_USERNAME is missing but is required.'
+        )
+
+    password = cfg.get('ARANGO_AUTH_PASSWORD', '')
+
+    if style == 'basic':
+        return BasicAuth(username, password)
+    elif style == 'jwt':
+        cache_str = cfg.get('ARANGO_AUTH_CACHE')
+        if cache_str is None or cache_str == '':
+            raise ValueError(
+                'For JWT Auth, ARANGO_AUTH_CACHE is required. It is not set.'
+            )
+
+        if cache_str == 'none':
+            cache = None
+        elif cache_str == 'disk':
+            min_lock_seconds = timeout_seconds
+            min_no_warn_lock_seconds = timeout_seconds + 1
+            def_lock_seconds = timeout_seconds + 3
+
+            lock_file = cfg.get('ARANGO_AUTH_CACHE_LOCK_FILE')
+            if lock_file is None or lock_file == '':
+                lock_file = '.arango_jwt.lock'
+
+            lock_seconds_str = cfg.get(
+                'ARANGO_AUTH_CACHE_LOCK_TIME_SECONDS', str(def_lock_seconds))
+            try:
+                lock_seconds = int(lock_seconds_str)
+            except ValueError:
+                raise ValueError(
+                    f'ARANGO_AUTH_CACHE_LOCK_TIME_SECONDS={lock_seconds_str} '
+                    + 'should be an int but could not be interpreted as such.'
+                )
+
+            if lock_seconds < min_lock_seconds:
+                raise ValueError(
+                    f'ARANGO_AUTH_CACHE_LOCK_TIME_SECONDS={lock_seconds_str} '
+                    + 'is dangerously low for the given request timeout! '
+                    + f'Should be at least {min_lock_seconds}'
+                )
+
+            if lock_seconds < min_no_warn_lock_seconds:
+                warnings.warn(
+                    f'ARANGO_AUTH_CACHE_LOCK_TIME_SECONDS={lock_seconds_str} '
+                    + 'is concerningly low for the given request timeout! '
+                    + f'Recommended to be at least {min_lock_seconds} to '
+                    + 'avoid false negatives.',
+                    UserWarning
+                )
+
+            jwt_file = cfg.get('ARANGO_AUTH_CACHE_STORE_FILE')
+            if jwt_file is None or jwt_file == '':
+                jwt_file = '.arango_jwt'
+
+            cache = JWTDiskCache(lock_file, lock_seconds, jwt_file)
+        else:
+            raise ValueError(
+                f'ARANGO_AUTH_CACHE={cache_str} is not a recognized JWT token '
+                + 'caching technique.'
+            )
+
+        return JWTAuth(username, password, cache)
+    else:
+        raise ValueError(
+            f'ARANGO_AUTH={style} is not a recognized authorization scheme'
+        )
+
+
+def env_disable_database_delete(cfg) -> bool:
+    """Determine if database delete convenience functions should be disabled.
+    See "env_config" for details."""
+    return cfg.get('ARANGO_DISABLE_DATABASE_DELETE') != 'false'
+
+
+def env_protected_databases(cfg) -> typing.List[str]:
+    """Determine what databases, if any, are protected even if database deletes
+    are in general allowed. See "env_config" for details."""
+    protected_str = cfg.get('ARANGO_PROTECTED_DATABASES')
+    if protected_str is None or protected_str == '':
+        return []
+
+    return protected_str.split(',')
+
+
+def env_disable_collection_delete(cfg) -> bool:
+    """Determine if collection delete convenience functions should be disabled.
+    See "env_config" for details."""
+    return cfg.get('ARANGO_DISABLE_COLLECTION_DELETE') != 'false'
+
+
+def env_protected_collections(cfg) -> typing.List[str]:
+    """Determine what collections, if any, are protected even if collection
+    deletes are in general allowed. See "env_config" for details."""
+    protected_str = cfg.get('ARANGO_PROTECTED_COLLECTIONS')
+    if protected_str is None or protected_str == '':
+        return []
+
+    return protected_str.split(',')
+
+
+def _get_with_error(cfg, key, error):
+    """Fetches key from cfg if it exists, otherwise raises an ValueError
+    with the given message. Empty string or None both raise ValueError.
+
+    Arguments:
+        cfg (dict): The dictionary to load the value from
+        key (str): The key to load from cfg
+        error (str): The error message if key is not set.
+    """
+    val = cfg.get(key, '')
+    if val == '':
+        raise ValueError(error)
+    return val

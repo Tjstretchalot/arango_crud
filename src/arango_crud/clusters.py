@@ -1,6 +1,8 @@
 """Describes an object responsible for distributing requests to a cluster as
 well as various common concrete implementations.
 """
+import pytypeutils as tus
+
 
 class Cluster:
     """Describes the interface for a cluster. This is something which is
@@ -29,7 +31,11 @@ class WeightedRandomCluster(Cluster):
             of B.
     """
     def __init__(self, urls, weights):
-        pass
+        tus.check(urls=(urls, (list, tuple)), weights=(weights, (list, tuple)))
+        tus.check_listlike(urls=(urls, str), weights=(weights, (int, float)))
+
+        self.urls = urls
+        self.weights = [float(w) for w in weights]
 
     def select_next_url(self):
         pass
@@ -44,7 +50,9 @@ class RandomCluster(Cluster):
         urls (list[str]): A list of urls for coordinators within the cluster
     """
     def __init__(self, urls):
-        pass
+        tus.check(urls=(urls, (list, tuple)))
+        tus.check_listlike(urls=(urls, str))
+        self.urls = urls
 
     def select_next_url(self):
         pass

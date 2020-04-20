@@ -13,13 +13,10 @@ from arango_crud import (  # noqa: E402
     JWTAuth,
     JWTDiskCache
 )
-from arango_crud.auths import StatefulAuth  # noqa: E402
+from arango_crud.auths import StatefulAuthWrapper  # noqa: E402
 
 
 class Test(unittest.TestCase):
-    def test_foo(self):
-        self.assertTrue(False)
-
     def test_cluster_random(self):
         cfg = env_config(
             cfg={
@@ -121,7 +118,7 @@ class Test(unittest.TestCase):
                 'ARANGO_AUTH_CACHE': 'none'
             }
         )
-        self.assertIsInstance(cfg.auth, StatefulAuth)
+        self.assertIsInstance(cfg.auth, StatefulAuthWrapper)
         self.assertIsInstance(cfg.auth.delegate, JWTAuth)
         self.assertEqual(cfg.auth.delegate.username, helper.TEST_USERNAME)
         self.assertEqual(cfg.auth.delegate.password, helper.TEST_PASSWORD)
@@ -140,7 +137,7 @@ class Test(unittest.TestCase):
                 'ARANGO_AUTH_CACHE_STORE_FILE': 'foo.jwt'
             }
         )
-        self.assertIsInstance(cfg.auth, StatefulAuth)
+        self.assertIsInstance(cfg.auth, StatefulAuthWrapper)
         self.assertIsInstance(cfg.auth.delegate, JWTAuth)
         self.assertEqual(cfg.auth.delegate.username, helper.TEST_USERNAME)
         self.assertEqual(cfg.auth.delegate.password, helper.TEST_PASSWORD)

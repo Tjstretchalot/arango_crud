@@ -4,6 +4,7 @@ Most of the time, however, it's just used to create a Collection instance
 within the database with the same configuration.
 """
 
+
 class Database:
     """A database within ArangoDB, which acts as a collection of Collections.
 

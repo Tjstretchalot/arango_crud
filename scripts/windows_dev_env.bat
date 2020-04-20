@@ -1,3 +1,5 @@
 echo off
-echo TODO
+SET TEST_ARANGO_CLUSTER_URLS=http://127.0.0.1:8529
+SET TEST_ARANGO_DB=test_arango_crud
+SET TEST_ARANGO_USERNAME=root
 echo on

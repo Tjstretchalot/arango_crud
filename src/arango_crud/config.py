@@ -2,6 +2,11 @@
 occurs. This is responsible for authenticating and initializing new Database
 instances with a backwards reference to this configuration.
 """
+from .auths import Auth, StatefulAuth, StatefulAuthWrapper
+from .clusters import Cluster
+from .back_off_strategies import BackOffStrategy
+import pytypeutils as tus
+
 
 class Config:
     """Describes how to connect to ArangoDB coordinators. Mainly responsible
@@ -37,7 +42,38 @@ class Config:
         """Initializes Config by setting the corresponding attributes. For
         auth if it is a StatefulAuth it is wrapped with a StatefulAuthWrapper.
         """
-        pass
+        if isinstance(auth, StatefulAuth):
+            auth = StatefulAuthWrapper(auth)
+        if protected_databases is None:
+            protected_databases = []
+        if protected_collections is None:
+            protected_collections = []
+
+        tus.check(
+            cluster=(cluster, Cluster),
+            timeout_seconds=(timeout_seconds, int),
+            back_off=(back_off, BackOffStrategy),
+            ttl_seconds=(ttl_seconds, (int, type(None))),
+            auth=(auth, Auth),
+            disable_database_delete=(disable_database_delete, bool),
+            protected_databases=(protected_databases, (list, tuple)),
+            disable_collection_delete=(disable_collection_delete, bool),
+            protected_collections=(protected_collections, (list, tuple))
+        )
+        tus.check_listlike(
+            protected_databases=(protected_databases, str),
+            protected_collections=(protected_collections, str)
+        )
+
+        self.cluster = cluster
+        self.timeout_seconds = timeout_seconds
+        self.back_off = back_off
+        self.ttl_seconds = ttl_seconds
+        self.auth = auth
+        self.disable_database_delete = disable_database_delete
+        self.protected_databases = protected_databases
+        self.disable_collection_delete = disable_collection_delete
+        self.protected_collections = protected_collections
 
     def database(self, name):
         """Fetch the Database object which acts as interface for using the

@@ -1,5 +1,7 @@
 """Describes an object that describes how to back-off if the cluster is having
 issues and provides a concrete implementation."""
+import pytypeutils as tus
+
 
 class BackOffStrategy:
     """Describes the interface for backing off from a cluster. These instances
@@ -26,7 +28,9 @@ class StepBackOffStrategy(BackOffStrategy):
             etc. If this has 2 elements, there will be 3 retries.
     """
     def __init__(self, steps):
-        pass
+        tus.check(steps=(steps, (list, tuple)))
+        tus.check_listlike(steps=(steps, (int, float)))
+        self.steps = [float(step) for step in steps]
 
     def get_back_off(self, num_failed_requests):
         pass
