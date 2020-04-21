@@ -9,6 +9,7 @@ from .auths import Auth, BasicAuth, JWTAuth, JWTDiskCache
 from urllib.parse import urlparse
 import warnings
 import typing
+import os
 
 
 def env_config(cfg=None):
@@ -168,6 +169,9 @@ def env_config(cfg=None):
     Returns:
         An Arango Config instance initialized using the values in the config.
     """
+    if cfg is None:
+        cfg = os.environ
+
     cluster = env_cluster(cfg)
     timeout_seconds = env_timeout_seconds(cfg)
     back_off = env_back_off(cfg)
@@ -467,5 +471,5 @@ def _get_with_error(cfg, key, error):
     """
     val = cfg.get(key, '')
     if val == '':
-        raise ValueError(error)
+        raise ValueError(f'missing environment variable {key}: {error}')
     return val

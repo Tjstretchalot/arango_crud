@@ -2,6 +2,7 @@
 well as various common concrete implementations.
 """
 import pytypeutils as tus
+import random
 
 
 class Cluster:
@@ -52,7 +53,10 @@ class RandomCluster(Cluster):
     def __init__(self, urls):
         tus.check(urls=(urls, (list, tuple)))
         tus.check_listlike(urls=(urls, str))
+        if not urls:
+            raise ValueError('need at least one URL')
         self.urls = urls
 
     def select_next_url(self):
-        pass
+        idx = random.randrange(len(self.urls))
+        return self.urls[idx]

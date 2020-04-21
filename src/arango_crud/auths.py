@@ -2,6 +2,7 @@
 """
 from dataclasses import dataclass
 import pytypeutils as tus
+import base64
 
 
 class Auth:
@@ -45,6 +46,7 @@ class BasicAuth(Auth):
     Attributes:
         username (str): The username to authenticate with
         password (str): The password to authenticate with
+        _header (str): The header we send on each request
     """
     def __init__(self, username, password):
         tus.check(
@@ -53,6 +55,9 @@ class BasicAuth(Auth):
         )
         self.username = username
         self.password = password
+        self._header = 'Basic ' + base64.b64encode(
+            (self.username + ':' + self.password).encode('ascii')
+        ).decode('ascii')
 
     def prepare(self):
         """Unused"""
@@ -71,7 +76,7 @@ class BasicAuth(Auth):
         """Uses the basic authentication strategy to set the Authorization
         header.
         """
-        pass
+        headers['Authorization'] = self._header
 
 
 class StatefulAuth(Auth):

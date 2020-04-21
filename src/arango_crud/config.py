@@ -86,7 +86,9 @@ class Config:
             The Database object which provides an interface to the
             corresponding database on ArangoDB.
         """
-        pass
+        from .database import Database
+
+        return Database(self, name)
 
     def prepare(self):
         """Performs any initial loading that is required on this configuration.
@@ -94,4 +96,4 @@ class Config:
         loads stateful information, typically JWTs, and hence uses locking
         mechanisms to maintain thread-safety.
         """
-        pass
+        self.auth.prepare()

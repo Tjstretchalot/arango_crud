@@ -3,6 +3,9 @@ supports existence checks, creation, and deletion on the database directly.
 Most of the time, however, it's just used to create a Collection instance
 within the database with the same configuration.
 """
+from .helper import http_get, http_post
+from .config import Config
+import pytypeutils as tus
 
 
 class Database:
@@ -13,8 +16,10 @@ class Database:
             cluster.
         name (str): The unique name for this database.
     """
-    def __init__(config, name):
-        pass
+    def __init__(self, config, name):
+        tus.check(config=(config, Config), name=(name, str))
+        self.config = config
+        self.name = name
 
     def create_if_not_exists(self):
         """Create this database if it does not exist remotely.
@@ -32,7 +37,16 @@ class Database:
             True if the database exists remotely, False when it does not exist
             remotely.
         """
-        pass
+        res = http_get(
+            self.config,
+            f'/_db/{self.name}/_api/database/current'
+        )
+        if res.status_code == 404:
+            return False
+        if res.status_code == 200:
+            return True
+        res.raise_for_status()
+        raise Exception(f'unexpected status code: {res.status_code}')
 
     def force_delete(self):
         """Deletes this database if it exists remotely, which will delete all
