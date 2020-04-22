@@ -3,6 +3,13 @@
 from dataclasses import dataclass
 import pytypeutils as tus
 import base64
+import threading
+import os
+import json
+import random
+import math
+import uuid
+import time
 
 
 class Auth:
@@ -93,31 +100,77 @@ class StatefulAuth(Auth):
 class StatefulAuthWrapper(Auth):
     """A concrete implementation of Auth which simply delegates to a stateful
     auth, except it will check if it's being used in a different thread or
-    process than it was initialized in. If this happens the underlying auth
-    is replaced with a new instance. This isn't perfect protection since
-    process ids and thread ids are reused but without any purposeful
-    serialization it's unlikely to fail.
+    process than it was initialized in. If being used in a different process
+    this can safely clean out local state and act as if it's a fresh instance,
+    since by nature of being in a different process we can't interfere with
+    other processes by writing.
+
+    On the other hand when we're being used within the same process but on a
+    different thread this is only able to catch the situation and raise an
+    error since it's the Config instance itself which needs to be replaced
+    to no longer reference this auth. See Config#thread_safe_copy for how
+    to do this.
 
     Attributes:
         delegate (StatefulAuth): The real underlying delegate instance
-        pid (int): The PID of the process the delegate was initialized in
-        tid (int): The TID of the current thread.
+        pid (int, None): The PID of the process the delegate was initialized
+            in, if it has been initialized already.
+        tid (int, None): The TID of the thread the delegate was initialized in,
+            if it has been initialized already.
     """
     def __init__(self, delegate):
-        self.delegate = delegate
-        # TODO
+        self.delegate = delegate.copy_and_strip_state()
+        self.pid = None
+        self.tid = None
 
     def prepare(self):
         """Verify PID and TID then delegate"""
-        pass
+        self._check_match_affinity()
+        return self.delegate.prepare()
 
     def try_recover_auth_failure(self):
         """Verify PID and TID then delegate"""
-        pass
+        self._check_match_affinity()
+        return self.delegate.try_recover_auth_failure()
 
     def authorize(self, headers):
         """Verify PID and TID then delegate"""
-        pass
+        self._check_match_affinity()
+        return self.delegate.authorize(headers)
+
+    def reset_affinity(self):
+        """Resets the affinity on this instance, stripping state so it can't
+        be harmful."""
+        self.pid = None
+        self.tid = None
+        self.delegate = self.delegate.copy_and_strip_state()
+
+    def _check_match_affinity(self):
+        """Verifies that we are running in our preferred process and thread.
+        If we are being run in the right process but the wrong thread we're
+        in shared memory and the only sane thing to do is raise an error."""
+        if self.pid is None:
+            self.pid = os.getpid()
+            self.tid = threading.get_ident()
+            return
+
+        if os.getpid() != self.pid:
+            self.reset_affinity()
+            return
+
+        if threading.get_ident() != self.tid:
+            raise RuntimeError(
+                'This StatefulAuthWrapper verifies that it is not being used '
+                + 'on different threads or different processes in order to ensure ' +
+                + 'the authorization approach does not get corrupted. When running ' +
+                + 'in multiple processes this can be handled automatically by this ' +
+                + 'instance reinitializing state, as writing to our instance variables '
+                + "won't be replicated across other processes. However, this detected "
+                + f'it was being run on process {self.pid}, thread {self.tid} and is now '
+                + f'being run on the same process but thread {threading.get_ident()}. '
+                + 'This requires that the Config instance itself is replaced using '
+                'Config#thread_safe_copy on the new thread'
+            )
 
 
 @dataclass
@@ -154,10 +207,10 @@ class JWTCache:
 
     def try_set(self, token):
         """Attempt to set the value in the cache to the given token. Only
-        called if we successfully acquired the lock recently. This should only
-        work if the lock is still held. Note that if we fail to set the JWT
-        token in the cache it will still be used by our instance. Hence if
-        this simply returns False it is effectively memory caching.
+        called if we successfully acquired the lock recently. Note that
+        if we fail to set the JWT token in the cache it will still be used
+        by our instance. Hence if this simply returns False it is effectively
+        memory caching.
 
         Arguments:
             token (JWTToken): The token that should be set in the cache
@@ -191,7 +244,126 @@ class JWTDiskCache(JWTCache):
         self.lock_time_seconds = lock_time_seconds
         self.store_file = store_file
 
-    # TODO
+    def fetch(self):
+        """See JWTCache#fetch"""
+        try:
+            with open(self.store_file, 'r') as fin:
+                str_contents = fin.read()
+        except FileNotFoundError:
+            return None
+
+        try:
+            json_contents = json.loads(str_contents)
+        except json.decoder.JSONDecodeError:
+            # This is a common error if the file was being written to while
+            # we were reading
+            return None
+
+        return JWTToken(
+            token=json_contents['token'],
+            expires_at_utc_seconds=json_contents['expires_at_utc_seconds']
+        )
+
+    def try_acquire_lock(self):
+        """See JWTCache#try_acquire_lock. This is a pessimistic locking tool to
+        avoid blowing up the size of the lock file too quickly"""
+        try_lock_at = time.time()
+        try:
+            with open(self.lock_file, 'r') as fin:
+                line_contents = fin.readlines()
+        except FileNotFoundError:
+            line_contents = None
+
+        num_lines = 0
+        if line_contents:
+            num_lines = len(line_contents)
+            str_last_line = line_contents[-1]
+            if str_last_line.strip() != '':
+                try:
+                    arr_last_line = json.loads(str_last_line)
+                except json.decoder.JSONDecodeError:
+                    # They were still writing; this shouldn't happen since we're
+                    # supposed to do atomic writes :/
+                    import warnings
+                    warnings.warn(
+                        'JWTDiskCache lock file is corrupted. If this file is '
+                        + 'not being manually modified then the OS is not '
+                        + 'performing atomic writes which could lead to '
+                        + 'irrecoverable desync due to write interleaving.',
+                        UserWarning
+                    )
+                    return False
+
+                locked_at = arr_last_line[1]
+                if locked_at > try_lock_at - self.lock_time_seconds:
+                    return False
+
+        lock_uuid = uuid.uuid4()
+        row = json.dumps([lock_uuid, try_lock_at]) + "\n"
+
+        # There are no reasons I can think of, which are recoverable, for this
+        # to fail.
+        with open(self.lock_file, 'a') as fout:
+            fout.write(row)
+
+        # Now we try to find our line and see if we won the race. If we won,
+        # we're going to be the line at index num_lines
+        lock_acquired = None
+        with open(self.lock_file, 'r') as fin:
+            for idx, line in enumerate(fin):
+                if idx < num_lines:
+                    continue
+
+                try:
+                    json.loads(line)
+                except json.decoder.JSONDecodeError:
+                    raise Exception(
+                        'OS is not performing atomic small disk writes, '
+                        + 'causing interleaving in the lock-file. This cannot '
+                        + ' be automatically recovered.'
+                    )
+
+                lock_acquired = line == row
+                break
+
+        if lock_acquired is None:
+            # If we got here the lock file was deleted between our write and our
+            # read.
+            return False
+
+        if lock_acquired:
+            if num_lines > 10_000:
+                # We're going to overwrite the file. This is effectively going
+                # to give up our lock for a tiny tiny period of time, so we
+                # have to repeat this process. Luckily with only one line it's
+                # a simpler process
+                with os.open(self.lock_file, 'w') as fout:
+                    fout.write(row)
+
+                with os.open(self.lock_file) as fin:
+                    first_row = fin.readline()
+
+                if first_row != row:
+                    return False
+
+        return lock_acquired
+
+    def try_set(self, token: JWTToken):
+        """See JWTCache#try_set. This cannot fail, assuming that the os
+        performs atomic writes for very small files which are only flushed
+        when closed. This also cannot fail if we still hold the lock. So
+        it would require a cacophony of errors to fail. Furthermore, if it
+        does fail almost certainly it will not lead to parsable json, hence
+        fetch will automatically recover. If it somehow errored every time,
+        we degrade to memory caching"""
+        dict_contents = {
+            'token': token.token,
+            'expires_at_utc_seconds': token.expires_at_utc_seconds
+        }
+        json_contents = json.dumps(dict_contents)
+        with open(self.store_file, 'w') as fout:
+            fout.write(json_contents)
+        return True
 
 
 class JWTAuth(StatefulAuth):
@@ -221,22 +393,72 @@ class JWTAuth(StatefulAuth):
         """If this has no token in memory it will attempt to acquire one (first
         through the cache and then through networking). If it has a token it
         will consider refreshing it."""
-        pass
+        if self._token is None:
+            self.force_refresh_token()
+            return
+
+        if self._token.expires_at_utc_seconds > time.time() - 60:
+            self.force_refresh_token()
+            return
+
+        target_refresh_at = -250_000 * math.log(random.random())
+        if self._token.expires_at_utc_seconds > time.time() - target_refresh_at:
+            self.try_refresh_token()
+            return
 
     def try_recover_auth_failure(self):
         """If this has an active token it will be cleared and this will return
         True. Otherwise this will return False."""
-        pass
+        if self._token is not None:
+            self._token = None
+            return True
+        return False
 
     def authorize(self, headers):
         """Will attempt to ensure an active token. If this cannot acquire a
         token, typically due to locking issues, an error will be raised.
-        Otherwise, the 'Authentication' header will be set in the dict of
+        Otherwise, the 'Authorization' header will be set in the dict of
         headers to authenticate with the JWT"""
-        pass
+        self.prepare()
+        if self._token is not None:
+            # If the token is None we want them to fail the request and
+            # see that we can't recover in try_recover_auth_failure
+            headers['Authorization'] = f'Bearer {self._token.token}'
 
     def copy_and_strip_state(self):
         """Returns a new JWTAuth instance which is exactly how this one was
         constructed. This must be called if the process is forked or this is
         accessed in a different thread."""
+        return JWTAuth(self.username, self.password, self.cache)
+
+    def try_refresh_token(self):
+        """Attempts to refresh the token. This will do nothing if we fail to
+        acquire the lock."""
+        if self.cache is None:
+            self._token = self.create_jwt_token()
+            return
+
+        if not self.cache.try_acquire_lock():
+            return
+
+        token = self.create_jwt_token()
+        self.cache.try_set(token)
+        self._token = token
+
+    def force_refresh_token(self):
+        if self.cache is None:
+            self._token = self.create_jwt_token()
+            return
+
+        acquired_lock = self.cache.try_acquire_lock()
+        token = self.create_jwt_token()
+        if acquired_lock:
+            self.cache.try_set(token)
+
+        self._token = token
+
+    def create_jwt_token(self) -> JWTToken:
+        """Create a new token through a network request to ArangoDB
+        """
+        # TODO we need access to the config for the cluster :/
         pass

@@ -15,9 +15,15 @@ from arango_crud import (  # noqa: E402
 )
 
 
-def my_runner(db):
+def my_runner(cfg, copy=False):
     """Used for testing concurrency"""
-    return db.check_if_exists()
+    if copy:
+        cfg = cfg.thread_safe_copy()
+    return (
+        cfg
+        .database(helper.TEST_ARANGO_DB)
+        .check_if_exists()
+    )
 
 
 class Test(unittest.TestCase):
@@ -71,7 +77,11 @@ class Test(unittest.TestCase):
         cfg = create_config()
 
         with ThreadPoolExecutor(max_workers=8) as executor:
-            res = executor.map(my_runner, [cfg for _ in range(100)])
+            res = executor.map(
+                my_runner,
+                [cfg for _ in range(100)],
+                [True for _ in range(100)]
+            )
             for i in range(100):
                 self.assertFalse(res[i], f'res={res}')
 

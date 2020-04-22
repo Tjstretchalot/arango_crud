@@ -5,8 +5,6 @@ import logging
 import requests
 import time
 from http.client import responses
-import os
-import json
 from .config import Config
 
 logger = logging.getLogger(__name__)
@@ -36,14 +34,13 @@ def http_method(method, config: Config, partial_url: str, **kwargs):
     """
     Performs the request using the given http verb (e.g., get, post, put). This
     will handle backing off according to the specified config. If backoffs are
-    exceeded this raises a requests.exceptions.RequestException
+    exceeded this raises a requests.exceptions.RequestException.
     """
     if 'headers' not in kwargs:
         kwargs['headers'] = {}
     if 'timeout' not in kwargs:
         kwargs['timeout'] = config.timeout_seconds
 
-    start_time = time.time()
     request_number = 1
 
     config.auth.authorize(kwargs['headers'])

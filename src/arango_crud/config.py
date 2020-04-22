@@ -97,3 +97,25 @@ class Config:
         mechanisms to maintain thread-safety.
         """
         self.auth.prepare()
+
+    def thread_safe_copy(self):
+        """Returns a copy of this instance with local variables removed. This
+        should be called whenever a config is suspected be used from a new
+        thread. Note that this is not necessary when forking as that can be
+        detected and handled due to copy-on-write semantics, but it won't
+        hurt. Note that read-only references are still copied by reference."""
+        if isinstance(self.auth, StatefulAuthWrapper):
+            return Config(
+                self.cluster,
+                self.timeout_seconds,
+                self.back_off,
+                self.ttl_seconds,
+                StatefulAuthWrapper(
+                    self.auth.delegate.copy_and_strip_state()
+                ),
+                disable_database_delete=self.disable_database_delete,
+                protected_databases=self.protected_databases,
+                disable_collection_delete=self.disable_collection_delete,
+                protected_collections=self.protected_collections
+            )
+        return self

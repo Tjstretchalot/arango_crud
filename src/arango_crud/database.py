@@ -3,7 +3,7 @@ supports existence checks, creation, and deletion on the database directly.
 Most of the time, however, it's just used to create a Collection instance
 within the database with the same configuration.
 """
-from .helper import http_get, http_post
+from .helper import http_get
 from .config import Config
 import pytypeutils as tus
 
