@@ -5,32 +5,31 @@ import logging
 import requests
 import time
 from http.client import responses
-from .config import Config
 
 logger = logging.getLogger(__name__)
 
 
-def http_get(config: Config, url: str, **kwargs):
+def http_get(config, url: str, **kwargs):
     return http_method('get', config, url, **kwargs)
 
 
-def http_post(config: Config, url: str, **kwargs):
+def http_post(config, url: str, **kwargs):
     return http_method('post', config, url, **kwargs)
 
 
-def http_patch(config: Config, url: str, **kwargs):
+def http_patch(config, url: str, **kwargs):
     return http_method('patch', config, url, **kwargs)
 
 
-def http_put(config: Config, url: str, **kwargs):
+def http_put(config, url: str, **kwargs):
     return http_method('put', config, url, **kwargs)
 
 
-def http_delete(config: Config, url: str, **kwargs):
+def http_delete(config, url: str, **kwargs):
     return http_method('delete', config, url, **kwargs)
 
 
-def http_method(method, config: Config, partial_url: str, **kwargs):
+def http_method(method, config, partial_url: str, **kwargs):
     """
     Performs the request using the given http verb (e.g., get, post, put). This
     will handle backing off according to the specified config. If backoffs are
@@ -43,7 +42,10 @@ def http_method(method, config: Config, partial_url: str, **kwargs):
 
     request_number = 1
 
-    config.auth.authorize(kwargs['headers'])
+    authorizing = kwargs.pop('add_authorization', True)
+    reattempted_auth = False
+    if authorizing:
+        config.auth.authorize(kwargs['headers'], config)
     while True:
         url = config.cluster.select_next_url()
         if url.endswith('/'):
@@ -65,13 +67,20 @@ def http_method(method, config: Config, partial_url: str, **kwargs):
             response_bytes = len(response.content)
             logger.info(
                 '(%s ms) COMPLETE: %s %s ||| %s %s; %s bytes',
-                request_time_ms, method, url, response.status_code,
+                request_time_ms, method.upper(), url, response.status_code,
                 responses.get(response.status_code, 'Unknown Status Code'),
                 response_bytes
             )
 
             if response.status_code < 500:
-                return response
+                if (authorizing
+                        and response.status_code == 401
+                        and not reattempted_auth
+                        and config.auth.try_recover_auth_failure()):
+                    config.auth.authorize(kwargs['headers'], config)
+                    reattempted_auth = True
+                else:
+                    return response
 
         if error is not None:
             logger.info(

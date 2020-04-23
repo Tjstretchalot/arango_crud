@@ -82,8 +82,8 @@ class Test(unittest.TestCase):
                 [cfg for _ in range(100)],
                 [True for _ in range(100)]
             )
-            for i in range(100):
-                self.assertFalse(res[i], f'res={res}')
+            for i, val in enumerate(res):
+                self.assertFalse(val, f'res={res}, i={i}')
 
         self.assertTrue(os.path.exists('test.jwt'))
         os.remove('test.jwt')
@@ -92,8 +92,8 @@ class Test(unittest.TestCase):
 
         with ProcessPoolExecutor(max_workers=8) as executor:
             res = executor.map(my_runner, [cfg for _ in range(100)])
-            for i in range(100):
-                self.assertFalse(res[i], f'res={res}')
+            for i, val in enumerate(res):
+                self.assertFalse(val, f'res={res}, i={i}')
 
         self.assertTrue(os.path.exists('test.jwt'))
         os.remove('test.jwt')

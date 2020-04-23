@@ -10,17 +10,21 @@ import random
 import math
 import uuid
 import time
+from . import helper
 
 
 class Auth:
     """Describes something which is capable of setting the authentication
     headers.
     """
-    def prepare(self):
+    def prepare(self, config):
         """A side-effectful call that sets the state up on this instance so
         that future requests can be served quickly. Not required to be called.
         Implementations which use this function should provide the option to
         use locking mechanisms to ensure thread and process safety.
+
+        @param [Config] config The configuration to use to make any requests
+            if necessary
         """
         raise NotImplementedError
 
@@ -34,7 +38,7 @@ class Auth:
         """
         raise NotImplementedError
 
-    def authorize(self, headers):
+    def authorize(self, headers, config):
         """Adds the required authentication headers to the given dict of
         headers. This may require network requests if this is a stateful
         authorization (see prepare).
@@ -42,6 +46,8 @@ class Auth:
         Arguments:
             headers (dict): A possible empty dictionary of headers which will
                 be passed to requests.
+            config (Config): The config to use for making any requests required
+                to authorize
         """
         raise NotImplementedError
 
@@ -66,7 +72,7 @@ class BasicAuth(Auth):
             (self.username + ':' + self.password).encode('ascii')
         ).decode('ascii')
 
-    def prepare(self):
+    def prepare(self, config):
         """Unused"""
         pass
 
@@ -79,7 +85,7 @@ class BasicAuth(Auth):
         """
         return False
 
-    def authorize(self, headers):
+    def authorize(self, headers, config):
         """Uses the basic authentication strategy to set the Authorization
         header.
         """
@@ -123,20 +129,20 @@ class StatefulAuthWrapper(Auth):
         self.pid = None
         self.tid = None
 
-    def prepare(self):
+    def prepare(self, config):
         """Verify PID and TID then delegate"""
         self._check_match_affinity()
-        return self.delegate.prepare()
+        return self.delegate.prepare(config)
 
     def try_recover_auth_failure(self):
         """Verify PID and TID then delegate"""
         self._check_match_affinity()
         return self.delegate.try_recover_auth_failure()
 
-    def authorize(self, headers):
+    def authorize(self, headers, config):
         """Verify PID and TID then delegate"""
         self._check_match_affinity()
-        return self.delegate.authorize(headers)
+        return self.delegate.authorize(headers, config)
 
     def reset_affinity(self):
         """Resets the affinity on this instance, stripping state so it can't
@@ -298,7 +304,7 @@ class JWTDiskCache(JWTCache):
                 if locked_at > try_lock_at - self.lock_time_seconds:
                     return False
 
-        lock_uuid = uuid.uuid4()
+        lock_uuid = str(uuid.uuid4())
         row = json.dumps([lock_uuid, try_lock_at]) + "\n"
 
         # There are no reasons I can think of, which are recoverable, for this
@@ -389,21 +395,21 @@ class JWTAuth(StatefulAuth):
         self.cache = cache
         self._token = None
 
-    def prepare(self):
+    def prepare(self, config):
         """If this has no token in memory it will attempt to acquire one (first
         through the cache and then through networking). If it has a token it
         will consider refreshing it."""
         if self._token is None:
-            self.force_refresh_token()
+            self.try_load_or_refresh_token(config)
             return
 
-        if self._token.expires_at_utc_seconds > time.time() - 60:
-            self.force_refresh_token()
+        if self._token.expires_at_utc_seconds < time.time() + 60:
+            self.force_refresh_token(config)
             return
 
         target_refresh_at = -250_000 * math.log(random.random())
-        if self._token.expires_at_utc_seconds > time.time() - target_refresh_at:
-            self.try_refresh_token()
+        if self._token.expires_at_utc_seconds < time.time() + target_refresh_at:
+            self.try_refresh_token(config)
             return
 
     def try_recover_auth_failure(self):
@@ -414,12 +420,12 @@ class JWTAuth(StatefulAuth):
             return True
         return False
 
-    def authorize(self, headers):
+    def authorize(self, headers, config):
         """Will attempt to ensure an active token. If this cannot acquire a
         token, typically due to locking issues, an error will be raised.
         Otherwise, the 'Authorization' header will be set in the dict of
         headers to authenticate with the JWT"""
-        self.prepare()
+        self.prepare(config)
         if self._token is not None:
             # If the token is None we want them to fail the request and
             # see that we can't recover in try_recover_auth_failure
@@ -431,34 +437,68 @@ class JWTAuth(StatefulAuth):
         accessed in a different thread."""
         return JWTAuth(self.username, self.password, self.cache)
 
-    def try_refresh_token(self):
+    def try_load_or_refresh_token(self, config):
+        """Attempt to load the token from catch or fetch it from a network
+        request. This may wait a while."""
+        if self.cache is None:
+            self._token = self.create_jwt_token(config)
+            return
+
+        for i in range(math.ceil(self.cache.lock_time_seconds / 10.0)):
+            self._token = self.cache.fetch()
+            if self._token is not None:
+                return
+            if self.cache.try_acquire_lock():
+                break
+            time.sleep(0.1)
+
+        token = self.create_jwt_token(config)
+        self.cache.try_set(token)
+        self._token = token
+
+    def try_refresh_token(self, config):
         """Attempts to refresh the token. This will do nothing if we fail to
         acquire the lock."""
         if self.cache is None:
-            self._token = self.create_jwt_token()
+            self._token = self.create_jwt_token(config)
             return
 
         if not self.cache.try_acquire_lock():
             return
 
-        token = self.create_jwt_token()
+        token = self.create_jwt_token(config)
         self.cache.try_set(token)
         self._token = token
 
-    def force_refresh_token(self):
+    def force_refresh_token(self, config):
         if self.cache is None:
-            self._token = self.create_jwt_token()
+            self._token = self.create_jwt_token(config)
             return
 
         acquired_lock = self.cache.try_acquire_lock()
-        token = self.create_jwt_token()
+        token = self.create_jwt_token(config)
         if acquired_lock:
             self.cache.try_set(token)
 
         self._token = token
 
-    def create_jwt_token(self) -> JWTToken:
+    def create_jwt_token(self, config) -> JWTToken:
         """Create a new token through a network request to ArangoDB
         """
-        # TODO we need access to the config for the cluster :/
-        pass
+        resp = helper.http_post(
+            config,
+            '/_open/auth',
+            add_authorization=False,
+            json={
+                'username': self.username,
+                'password': self.password
+            }
+        )
+        resp.raise_for_status()
+        token = resp.json()['jwt']
+        expected_expire_time = time.time() + 60 * 60 * 24 * 30
+
+        return JWTToken(
+            token=token,
+            expires_at_utc_seconds=expected_expire_time
+        )

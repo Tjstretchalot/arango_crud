@@ -96,7 +96,7 @@ class Config:
         loads stateful information, typically JWTs, and hence uses locking
         mechanisms to maintain thread-safety.
         """
-        self.auth.prepare()
+        self.auth.prepare(self)
 
     def thread_safe_copy(self):
         """Returns a copy of this instance with local variables removed. This
