@@ -1,6 +1,5 @@
 import unittest
-import sys
-import helper
+import helper  # noqa: F401
 from arango_crud import (  # noqa: E402
     StepBackOffStrategy
 )

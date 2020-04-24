@@ -1,9 +1,7 @@
 """Tests using the TTL; arangodb can have long delays on actually applying
 TTL indices so this isn't as strong as a test as we'd like"""
 import unittest
-import sys
-import helper
-import time
+import helper  # noqa: F401
 from arango_crud import (  # noqa: E402
     Config,
     RandomCluster,

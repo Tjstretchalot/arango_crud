@@ -1,5 +1,4 @@
 import unittest
-import sys
 import helper
 import os
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor

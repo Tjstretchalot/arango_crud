@@ -1,5 +1,4 @@
 import unittest
-import sys
 import helper
 from arango_crud import (  # noqa: E402
     env_config,
