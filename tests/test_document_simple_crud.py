@@ -1,9 +1,6 @@
 import unittest
 import sys
-from . import helper
-
-sys.path.append('src')
-
+import helper
 from arango_crud import (  # noqa: E402
     Config,
     RandomCluster,
@@ -42,7 +39,7 @@ class Test(unittest.TestCase):
         coll.create_or_overwrite_doc('test_doc', {'a': 'A'})
         self.assertEqual(coll.read_doc('test_doc'), {'a': 'A'})
         self.assertTrue(coll.touch_doc('test_doc'))
-        self.assertTrue(coll.touch_doc('test_doc'), ttl=120)
+        self.assertTrue(coll.touch_doc('test_doc', ttl=120))
         self.assertTrue(coll.force_delete_doc('test_doc'))
 
         self.assertTrue(db.force_delete())

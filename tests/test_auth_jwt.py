@@ -1,11 +1,8 @@
 import unittest
 import sys
-from . import helper
+import helper
 import os
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-
-sys.path.append('src')
-
 from arango_crud import (  # noqa: E402
     Config,
     RandomCluster,

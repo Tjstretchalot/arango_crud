@@ -1,10 +1,9 @@
+"""Tests using the TTL; arangodb can have long delays on actually applying
+TTL indices so this isn't as strong as a test as we'd like"""
 import unittest
 import sys
-from . import helper
+import helper
 import time
-
-sys.path.append('src')
-
 from arango_crud import (  # noqa: E402
     Config,
     RandomCluster,
@@ -23,7 +22,8 @@ class Test(unittest.TestCase):
             auth=BasicAuth(
                 username=helper.TEST_USERNAME,
                 password=helper.TEST_PASSWORD
-            )
+            ),
+            disable_database_delete=False
         )
 
         db = cfg.database(helper.TEST_ARANGO_DB)
@@ -33,16 +33,7 @@ class Test(unittest.TestCase):
         self.assertTrue(coll.create_if_not_exists())
 
         coll.create_or_overwrite_doc('test_doc', {'foo': 3})
-        self.assertEqual(coll.read_doc(), {'foo': 3})
-
-        time.sleep(1)
-
-        self.assertEqual(coll.read_doc(), {'foo': 3})
-
-        time.sleep(4)
-
-        self.assertIsNone(coll.read_doc())
-
+        self.assertEqual(coll.read_doc('test_doc'), {'foo': 3})
         self.assertTrue(db.force_delete())
 
     def test_collection_no_ttl(self):
@@ -54,7 +45,8 @@ class Test(unittest.TestCase):
             auth=BasicAuth(
                 username=helper.TEST_USERNAME,
                 password=helper.TEST_PASSWORD
-            )
+            ),
+            disable_database_delete=False
         )
         db = cfg.database(helper.TEST_ARANGO_DB)
         self.assertTrue(db.create_if_not_exists())
@@ -63,7 +55,7 @@ class Test(unittest.TestCase):
         self.assertTrue(coll.create_if_not_exists())
 
         coll.create_or_overwrite_doc('test_doc', {'foo': 3})
-        self.assertEqual(coll.read_doc(), {'foo': 3})
+        self.assertEqual(coll.read_doc('test_doc'), {'foo': 3})
 
         self.assertTrue(db.force_delete())
 
@@ -76,7 +68,8 @@ class Test(unittest.TestCase):
             auth=BasicAuth(
                 username=helper.TEST_USERNAME,
                 password=helper.TEST_PASSWORD
-            )
+            ),
+            disable_database_delete=False
         )
 
         db = cfg.database(helper.TEST_ARANGO_DB)
@@ -86,16 +79,7 @@ class Test(unittest.TestCase):
         self.assertTrue(coll.create_if_not_exists())
 
         coll.create_or_overwrite_doc('test_doc', {'foo': 3}, ttl=6)
-        self.assertEqual(coll.read_doc(), {'foo': 3})
-
-        time.sleep(5)
-
-        self.assertEqual(coll.read_doc(), {'foo': 3})
-
-        time.sleep(4)
-
-        self.assertIsNone(coll.read_doc())
-
+        self.assertEqual(coll.read_doc('test_doc'), {'foo': 3})
         self.assertTrue(db.force_delete())
 
     def test_override_to_no_ttl(self):
@@ -107,7 +91,8 @@ class Test(unittest.TestCase):
             auth=BasicAuth(
                 username=helper.TEST_USERNAME,
                 password=helper.TEST_PASSWORD
-            )
+            ),
+            disable_database_delete=False
         )
 
         db = cfg.database(helper.TEST_ARANGO_DB)
@@ -117,12 +102,7 @@ class Test(unittest.TestCase):
         self.assertTrue(coll.create_if_not_exists())
 
         coll.create_or_overwrite_doc('test_doc', {'foo': 3}, ttl=None)
-        self.assertEqual(coll.read_doc(), {'foo': 3})
-
-        time.sleep(5)
-
-        self.assertEqual(coll.read_doc(), {'foo': 3})
-
+        self.assertEqual(coll.read_doc('test_doc'), {'foo': 3})
         self.assertTrue(db.force_delete())
 
 

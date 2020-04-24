@@ -1,8 +1,6 @@
 import unittest
 import sys
-
-sys.path.append('src')
-
+import helper
 from arango_crud import (  # noqa: E402
     RandomCluster,
     WeightedRandomCluster

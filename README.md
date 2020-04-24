@@ -49,7 +49,7 @@ from arango_crud import (
 )
 
 config = Config(
-    cluster=RandomCluster(),  # see Cluster Styles
+    cluster=RandomCluster(urls=['http://127.0.0.1:8529']),  # see Cluster Styles
     timeout_seconds=3,
     back_off=StepBackOffStrategy([0.1, 0.5, 1, 1, 1]),  # see Back Off Strategies
     auth=BasicAuth(username='root', password=''),
@@ -199,8 +199,9 @@ coll.force_delete_doc('tj')
 # a supported atomic operation on ArangoDB and is hence faked with
 # read -> compare_and_swap. Presumably if the CAS fails the document was
 # touched recently anyway.
-coll.create_or_overwrite_doc('tj', {'name': 'TJ'}, ttl=30) # True
+coll.create_or_overwrite_doc('tj', {'name': 'TJ'}, ttl=30) # None
 coll.touch_doc('tj', ttl=60) # True
+coll.force_delete_doc('tj') # True
 
 # Alternative interface. For anything except one-liners, usually nicer.
 doc = coll.document('tj')

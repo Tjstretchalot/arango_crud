@@ -1,9 +1,6 @@
 import unittest
 import sys
-from . import helper
-
-sys.path.append('src')
-
+import helper
 from arango_crud import (  # noqa: E402
     Config,
     RandomCluster,
@@ -18,7 +15,7 @@ from arango_crud import (  # noqa: E402
 class Test(unittest.TestCase):
     def test_code_as_config_basic_auth(self):
         config = Config(
-            cluster=RandomCluster(),  # see Cluster Styles
+            cluster=RandomCluster(urls=['http://127.0.0.1:8529']),  # see Cluster Styles
             timeout_seconds=3,
             back_off=StepBackOffStrategy([0.1, 0.5, 1, 1, 1]),  # see Back Off Strategies
             auth=BasicAuth(username='root', password=''),
@@ -99,13 +96,13 @@ class Test(unittest.TestCase):
         )
         config.prepare()
 
-        db = config.database('my_db')
+        db = config.database(helper.TEST_ARANGO_DB)
         self.assertTrue(db.create_if_not_exists())
         coll = db.collection('users')
         self.assertTrue(coll.create_if_not_exists())
 
         # The simplest interface
-        self.assertTrue(coll.create_or_overwrite_doc('tj', {'name': 'TJ'}))
+        self.assertIsNone(coll.create_or_overwrite_doc('tj', {'name': 'TJ'}))
         self.assertEqual(coll.read_doc('tj'), {'name': 'TJ'})
         self.assertTrue(coll.force_delete_doc('tj'))
 
@@ -119,6 +116,7 @@ class Test(unittest.TestCase):
         # touched recently anyway.
         coll.create_or_overwrite_doc('tj', {'name': 'TJ'}, ttl=30)
         self.assertTrue(coll.touch_doc('tj', ttl=60))
+        self.assertTrue(coll.force_delete_doc('tj'))
 
         # Alternative interface. For anything except one-liners, usually nicer.
         doc = coll.document('tj')
@@ -174,7 +172,7 @@ class Test(unittest.TestCase):
             self.assertEqual(doc.body, {'name': 'TJ', 'note': 'Pretty cool'})
 
         coll.force_delete()
-        db.force_delete()
+        self.assertTrue(db.force_delete())
 
     def test_weighted_random_cluster(self):
         cluster = WeightedRandomCluster(

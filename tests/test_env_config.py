@@ -1,9 +1,6 @@
 import unittest
 import sys
-from . import helper
-
-sys.path.append('src')
-
+import helper
 from arango_crud import (  # noqa: E402
     env_config,
     RandomCluster,

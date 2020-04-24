@@ -1,6 +1,10 @@
 """Describes a single document within ArangoDB. This is what actually stores
 the data. Amounts to a single JSON object with create/read/overwrite/delete
 semantics with optional time-to-live."""
+from .collection import Collection
+from . import helper
+import pytypeutils as tus
+from datetime import datetime, timedelta
 
 
 class Document:
@@ -21,7 +25,11 @@ class Document:
             be modified directly.
     """
     def __init__(self, collection, key):
-        pass
+        tus.check(collection=(collection, Collection), key=(key, str))
+        self.collection = collection
+        self.key = key
+        self.etag = None
+        self.body = {}
 
     def read(self):
         """Fetches the current value for this document from remote. If this
@@ -33,7 +41,20 @@ class Document:
             True if the document was found and loaded from ArangoDB, False
             if the document did not exist.
         """
-        pass
+        resp = helper.http_get(
+            self.collection.database.config,
+            f'/_db/{self.collection.database.name}/_api/document/{self.collection.name}/{self.key}'
+        )
+        if resp.status_code == 404:
+            self.body = {}
+            self.etag = None
+            return False
+        resp.raise_for_status()
+        if resp.status_code != 200:
+            raise Exception(f'unexpected status code {resp.status_code} for doc read')
+        self.body = resp.json()['value']
+        self.etag = resp.headers['etag']
+        return True
 
     def read_if_remote_newer(self):
         """If the remote has a different etag than we have locally, this
@@ -48,7 +69,22 @@ class Document:
             ArangoDB, False if the document did not exist or was at the same
             version.
         """
-        pass
+        assert self.etag is not None
+        resp = helper.http_get(
+            self.collection.database.config,
+            f'/_db/{self.collection.database.name}/_api/document/{self.collection.name}/{self.key}',
+            headers={
+                'If-None-Match': self.etag
+            }
+        )
+        if resp.status_code == 304 or resp.status_code == 404:
+            return False
+        resp.raise_for_status()
+        if resp.status_code != 200:
+            raise Exception(f'unexpected status code {resp.status_code} for get doc with etag')
+        self.body = resp.json()['value']
+        self.etag = resp.headers['etag']
+        return True
 
     def create(self, ttl='default'):
         """If this document does not exist remotely it is created with our
@@ -67,7 +103,25 @@ class Document:
             True if the document did not exist and was created, False if the
             document did exist and was not modified.
         """
-        pass
+        assert self.etag is None
+
+        exp_at = self._calculate_expires_at_str(ttl)
+        resp = helper.http_post(
+            self.collection.database.config,
+            f'/_db/{self.collection.database.name}/_api/document/{self.collection.name}',
+            json={
+                '_key': self.key,
+                'expires_at': exp_at,
+                'value': self.body
+            }
+        )
+        if resp.status_code == 409:
+            return False
+        resp.raise_for_status()
+        if resp.status_code == 201 or resp.status_code == 202:
+            self.etag = resp.headers['etag']
+            return True
+        raise Exception(f'unexpected status code {resp.status_code} for create doc')
 
     def compare_and_swap(self, ttl='default'):
         """Performs a compare-and-swap operation. If the remote document exists
@@ -88,7 +142,27 @@ class Document:
             True if the remote document matched our etag and was updated, False
             if the remote document did not match and was not changed.
         """
-        pass
+        assert self.etag is not None
+
+        exp_at = self._calculate_expires_at_str(ttl)
+        resp = helper.http_put(
+            self.collection.database.config,
+            f'/_db/{self.collection.database.name}/_api/document/{self.collection.name}/{self.key}',
+            json={
+                'expires_at': exp_at,
+                'value': self.body
+            },
+            headers={
+                'If-Match': self.etag
+            }
+        )
+        if resp.status_code == 412 or resp.status_code == 404:
+            return False
+        resp.raise_for_status()
+        if resp.status_code == 201 or resp.status_code == 202:
+            self.etag = resp.headers['etag']
+            return True
+        raise Exception(f'unexpected status code {resp.status_code} for replace doc')
 
     def overwrite(self, ttl='default'):
         """If this document exists in ArangoDB the body is updated, the TTL is
@@ -104,7 +178,22 @@ class Document:
             True if the remote document existed and was updated, False if the
             remote document did not exist and was not created.
         """
-        pass
+        exp_at = self._calculate_expires_at_str(ttl)
+        resp = helper.http_put(
+            self.collection.database.config,
+            f'/_db/{self.collection.database.name}/_api/document/{self.collection.name}/{self.key}',
+            json={
+                'expires_at': exp_at,
+                'value': self.body
+            }
+        )
+        if resp.status_code == 404:
+            return False
+        resp.raise_for_status()
+        if resp.status_code == 201 or resp.status_code == 202:
+            self.etag = resp.headers['etag']
+            return True
+        raise Exception(f'unexpected status code {resp.status_code} for replace doc')
 
     def create_or_overwrite(self, ttl='default'):
         """Regardless of the state of this document in ArangoDB, it will be
@@ -117,7 +206,24 @@ class Document:
                 'default' to take the value set in Config, or the value None to
                 never expire.
         """
-        pass
+        exp_at = self._calculate_expires_at_str(ttl)
+        resp = helper.http_post(
+            self.collection.database.config,
+            (
+                f'/_db/{self.collection.database.name}'
+                + f'/_api/document/{self.collection.name}?overwrite=true'
+            ),
+            json={
+                '_key': self.key,
+                'expires_at': exp_at,
+                'value': self.body
+            }
+        )
+        resp.raise_for_status()
+        if resp.status_code == 201 or resp.status_code == 202:
+            self.etag = resp.headers['etag']
+            return True
+        raise Exception(f'unexpected status code {resp.status_code} for create doc')
 
     def compare_and_delete(self):
         """If the remote document exists and has the same etag it is deleted.
@@ -130,7 +236,24 @@ class Document:
             True if the remote document matched and was deleted. False when the
             remote document did not match and was not changed.
         """
-        pass
+        assert self.etag is not None
+        resp = helper.http_delete(
+            self.collection.database.config,
+            (
+                f'/_db/{self.collection.database.name}'
+                + f'/_api/document/{self.collection.name}/{self.key}'
+            ),
+            headers={
+                'If-Match': self.etag
+            }
+        )
+        if resp.status_code == 404 or resp.status_code == 412:
+            return False
+        resp.raise_for_status()
+        if resp.status_code == 200 or resp.status_code == 202:
+            self.etag = None
+            return True
+        raise Exception(f'unexpected status code {resp.status_code} for delete doc')
 
     def force_delete(self):
         """Forcibly delete the remote document, without checking its version.
@@ -139,4 +262,41 @@ class Document:
             True if the remote document existed and was deleted, False when the
             remote document did not exist and was not changed.
         """
-        pass
+        resp = helper.http_delete(
+            self.collection.database.config,
+            (
+                f'/_db/{self.collection.database.name}'
+                + f'/_api/document/{self.collection.name}/{self.key}'
+            )
+        )
+        if resp.status_code == 404:
+            return False
+        resp.raise_for_status()
+        if resp.status_code == 200 or resp.status_code == 202:
+            self.etag = None
+            return True
+        raise Exception(f'unexpected status code {resp.status_code} for delete doc')
+
+    def _calculate_expires_at_str(self, ttl):
+        """Calculate the expires at time as an iso-formatted string for the
+        given ttl.
+
+        Args:
+            ttl (str, int, None): The string 'default', a time in seconds, or
+                None to return None
+
+        Returns:
+            An iso-formatted date time string for expiration if ttl is not None
+            (and either config ttl is not None or ttl is not default)
+        """
+        tus.check(ttl=(ttl, (str, int, type(None))))
+        if ttl == 'default':
+            ttl = self.collection.database.config.ttl_seconds
+        elif isinstance(ttl, str):
+            raise ValueError(f'ttl should be int, None, or \'default\', got \'{ttl}\'')
+
+        if ttl is None:
+            return None
+
+        exp_at = datetime.now() + timedelta(seconds=ttl)
+        return exp_at.isoformat()

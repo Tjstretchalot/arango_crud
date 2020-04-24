@@ -1,9 +1,6 @@
 import unittest
 import sys
-from . import helper
-
-sys.path.append('src')
-
+import helper
 from arango_crud import (  # noqa: E402
     Config,
     RandomCluster,
@@ -42,8 +39,7 @@ class Test(unittest.TestCase):
         self.assertEqual(doc.body, {})
         self.assertFalse(doc.read())
         self.assertEqual(doc.body, {})
-        self.assertFalse(doc.read_if_remote_newer())
-        self.assertEqual(doc.body, {})
+        self.assertRaises(AssertionError, lambda: doc.read_if_remote_newer())
         self.assertRaises(AssertionError, lambda: doc.compare_and_delete())
         self.assertRaises(AssertionError, lambda: doc.compare_and_swap())
         self.assertFalse(doc.overwrite())
@@ -127,10 +123,13 @@ class Test(unittest.TestCase):
         self.assertEqual(doc2.body, {'a': 13})
 
         doc.body['a'] = 3
+        self.assertTrue(doc.overwrite())
         self.assertFalse(doc2.compare_and_swap())
-        self.assertEqual(doc2.body, {'a': 3})
-        self.assertTrue(doc2.read())
         self.assertEqual(doc2.body, {'a': 13})
+        self.assertTrue(doc2.read())
+        self.assertEqual(doc2.body, {'a': 3})
+
+        self.assertTrue(db.force_delete())
 
     def test_overwrite(self):
         cfg = create_config()
@@ -203,9 +202,10 @@ class Test(unittest.TestCase):
         self.assertTrue(doc.compare_and_delete())
         self.assertEqual(doc.body, {'a': 'A'})
         self.assertFalse(doc.read())
-        self.assertEqual(doc.body, {'a': 'A'})
+        self.assertEqual(doc.body, {})
         self.assertRaises(AssertionError, lambda: doc.compare_and_delete())
 
+        doc.body['a'] = 'A'
         self.assertTrue(doc.create())
 
         doc2 = coll.document('test_doc')
@@ -246,7 +246,10 @@ class Test(unittest.TestCase):
         self.assertEqual(doc.body, {'a': 'z'})
         self.assertTrue(doc.force_delete())
         self.assertFalse(doc.read())
+        self.assertEqual(doc.body, {})
         self.assertFalse(doc.force_delete())
+        doc.body['a'] = 'z'
+        self.assertEqual(doc.body, {'a': 'z'})
         self.assertTrue(doc.create())
 
         doc2 = coll.document('test_doc')

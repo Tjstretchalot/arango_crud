@@ -1,9 +1,6 @@
 import unittest
 import sys
-from . import helper
-
-sys.path.append('src')
-
+import helper
 from arango_crud import (  # noqa: E402
     Config,
     RandomCluster,
@@ -92,7 +89,7 @@ class Test(unittest.TestCase):
             ),
             disable_database_delete=False,
             disable_collection_delete=False,
-            protected_collections=[helper.TEST_ARANGO_DB]
+            protected_collections=['test_coll']
         )
         db = cfg.database(helper.TEST_ARANGO_DB)
         coll = db.collection('test_coll')

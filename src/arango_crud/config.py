@@ -37,8 +37,8 @@ class Config:
     """
     def __init__(
             self, cluster, timeout_seconds, back_off, ttl_seconds, auth,
-            disable_database_delete=False, protected_databases=None,
-            disable_collection_delete=False, protected_collections=None):
+            disable_database_delete=True, protected_databases=None,
+            disable_collection_delete=True, protected_collections=None):
         """Initializes Config by setting the corresponding attributes. For
         auth if it is a StatefulAuth it is wrapped with a StatefulAuthWrapper.
         """

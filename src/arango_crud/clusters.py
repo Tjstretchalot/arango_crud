@@ -30,6 +30,8 @@ class WeightedRandomCluster(Cluster):
             the weight of the corresponding index in urls. If url A and B are
             such that A has 2x the weight of B, A will receive 2x the requests
             of B.
+        _rolling_sum_weights (list[float]): The rolling sums of weights. If
+            weights are 1, 2, 3 then this is 1, 3, 6
     """
     def __init__(self, urls, weights):
         tus.check(urls=(urls, (list, tuple)), weights=(weights, (list, tuple)))
@@ -37,9 +39,20 @@ class WeightedRandomCluster(Cluster):
 
         self.urls = urls
         self.weights = [float(w) for w in weights]
+        self._rolling_sum_weights = []
+
+        _sum = 0.0
+        for weight in self.weights:
+            _sum += weight
+            self._rolling_sum_weights.append(_sum)
 
     def select_next_url(self):
-        pass
+        choice = random.random() * self._rolling_sum_weights[-1]
+        return next(
+            self.urls[idx]
+            for (idx, roll_sum) in enumerate(self._rolling_sum_weights)
+            if roll_sum >= choice
+        )
 
 
 class RandomCluster(Cluster):

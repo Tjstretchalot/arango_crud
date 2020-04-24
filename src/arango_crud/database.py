@@ -3,7 +3,7 @@ supports existence checks, creation, and deletion on the database directly.
 Most of the time, however, it's just used to create a Collection instance
 within the database with the same configuration.
 """
-from .helper import http_get
+from . import helper
 from .config import Config
 import pytypeutils as tus
 
@@ -28,7 +28,38 @@ class Database:
             True if the database did not exist and was created, False if it
             did exist and was not changed.
         """
-        pass
+
+        # This is a bit hacky but it's weird we have to specify it for
+        # each new database...
+        username = None
+        password = None
+        if hasattr(self.config.auth, 'username'):
+            username = self.config.auth.username
+            password = self.config.auth.password
+        else:
+            username = self.config.auth.delegate.username
+            password = self.config.auth.delegate.password
+
+        resp = helper.http_post(
+            self.config,
+            f'/_api/database',
+            json={
+                'name': self.name,
+                'users': [
+                    {
+                        'username': username,
+                        'password': password,
+                        'active': True
+                    }
+                ]
+            }
+        )
+        if resp.status_code == 409:
+            return False
+        resp.raise_for_status()
+        if resp.status_code != 201:
+            raise Exception(f'Unexpected status code {resp.status_code} for create index')
+        return True
 
     def check_if_exists(self):
         """Determines if this database exists remotely.
@@ -37,7 +68,7 @@ class Database:
             True if the database exists remotely, False when it does not exist
             remotely.
         """
-        res = http_get(
+        res = helper.http_get(
             self.config,
             f'/_db/{self.name}/_api/database/current'
         )
@@ -62,7 +93,18 @@ class Database:
             True if the database existed remotely and was deleted, False if it
             did not exist remotely.
         """
-        pass
+        assert not self.config.disable_database_delete
+        assert self.name not in self.config.protected_databases
+        res = helper.http_delete(
+            self.config,
+            f'/_api/database/{self.name}'
+        )
+        if res.status_code == 404:
+            return False
+        res.raise_for_status()
+        if res.status_code != 200:
+            raise Exception(f'unexpected status code {res.status_code} for drop database')
+        return True
 
     def collection(self, name):
         """Initialize the Collection object within this Database with the given
@@ -75,4 +117,5 @@ class Database:
         Returns:
             The collection instance within this database with the given name.
         """
-        pass
+        from .collection import Collection
+        return Collection(self, name)
