@@ -390,8 +390,13 @@ class JWTAuth(StatefulAuth):
         not actually attempt to use the cache or initialize the token yet; that
         will be done on the next prepare or authorize.
         """
+        tus.check(
+            username=(username, str),
+            password=(password, (str, type(None))),
+            cache=(cache, (JWTCache, type(None)))
+        )
         self.username = username
-        self.password = password
+        self.password = password if password is not None else ''
         self.cache = cache
         self._token = None
 
@@ -494,6 +499,8 @@ class JWTAuth(StatefulAuth):
                 'password': self.password
             }
         )
+        if resp.status_code != 200:
+            print(resp.json())
         resp.raise_for_status()
         token = resp.json()['jwt']
         expected_expire_time = time.time() + 60 * 60 * 24 * 30

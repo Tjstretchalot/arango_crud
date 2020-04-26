@@ -46,6 +46,13 @@ def http_method(method, config, partial_url: str, **kwargs):
     reattempted_auth = False
     if authorizing:
         config.auth.authorize(kwargs['headers'], config)
+
+    log_extra = kwargs.get('json', {}).get('_key')
+    if log_extra is not None:
+        log_extra = f' (key={log_extra})'
+    else:
+        log_extra = ''
+
     while True:
         url = config.cluster.select_next_url()
         if url.endswith('/'):
@@ -66,8 +73,9 @@ def http_method(method, config, partial_url: str, **kwargs):
         if response is not None:
             response_bytes = len(response.content)
             logger.info(
-                '(%s ms) COMPLETE: %s %s ||| %s %s; %s bytes',
-                request_time_ms, method.upper(), url, response.status_code,
+                '(%s ms) COMPLETE: %s %s%s ||| %s %s; %s bytes',
+                request_time_ms, method.upper(), url, log_extra,
+                response.status_code,
                 responses.get(response.status_code, 'Unknown Status Code'),
                 response_bytes
             )
@@ -84,8 +92,8 @@ def http_method(method, config, partial_url: str, **kwargs):
 
         if error is not None:
             logger.info(
-                '(%s ms) ERROR: %s %s ||| %s',
-                request_time_ms, method.upper(), url, error
+                '(%s ms) ERROR: %s %s%s ||| %s',
+                request_time_ms, method.upper(), url, log_extra, error
             )
 
         delay = config.back_off.get_back_off(request_number)

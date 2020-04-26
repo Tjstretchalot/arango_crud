@@ -4,7 +4,7 @@ semantics with optional time-to-live."""
 from .collection import Collection
 from . import helper
 import pytypeutils as tus
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class Document:
@@ -298,5 +298,5 @@ class Document:
         if ttl is None:
             return None
 
-        exp_at = datetime.now() + timedelta(seconds=ttl)
-        return exp_at.isoformat()
+        exp_at = datetime.utcnow() + timedelta(seconds=ttl)
+        return exp_at.replace(tzinfo=timezone.utc).isoformat()

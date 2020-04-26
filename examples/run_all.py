@@ -1,9 +1,16 @@
 """Runs the main() function of all other py files in this directory"""
 import os
 import importlib
+import sys
 
 
 def main():
+    try:
+        import arango_crud  # noqa: F401
+    except ModuleNotFoundError:
+        sys.path.append('src')
+        import arango_crud  # noqa: F401
+
     dir_path = os.path.dirname(os.path.realpath(__file__))
     for curdir, _, files in os.walk(dir_path):
         for f in files:
