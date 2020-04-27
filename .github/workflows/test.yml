@@ -14,7 +14,7 @@ jobs:
         ports:
           - 8529/tcp
         env:
-          ARANGO_NO_AUTH: 1
+          ARANGO_ROOT_PASSWORD: password
     steps:
     - name: Setup Python ${{ matrix.python_version }}
       uses: actions/setup-python@v1
@@ -45,6 +45,7 @@ jobs:
         TEST_ARANGO_CLUSTER_URLS: http://127.0.0.1:${{ job.services.arangodb.ports['8529'] }}
         TEST_ARANGO_DB: test_arango_crud
         TEST_ARANGO_USERNAME: root
+        TEST_ARANGO_PASSWORD: password
     - name: Run examples..
       run: |
         coverage run --rcfile=.coveragerc_examples examples/run_all.py
@@ -54,5 +55,6 @@ jobs:
         ARANGO_DB: arango_crud
         ARANGO_AUTH: basic
         ARANGO_AUTH_USERNAME: root
+        ARANGO_AUTH_PASSWORD: password
         ARANGO_APPLY_BASIC_CONFIG: true
         ARANGO_TTL_SECONDS: 3600
