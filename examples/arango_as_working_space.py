@@ -10,10 +10,9 @@ completes quickly but is trivially configurable.
 import numpy as np
 import time
 
-# suggested verbose numbers: 100, 40
-VERBOSE = False
-NUM_FLOATS_IN_DATA_ARRAY = 524_288
-NUM_FLOATS_IN_SORTER_MEMORY = 32_768
+# suggested real numbers: 524_288, 32_768
+NUM_FLOATS_IN_DATA_ARRAY = 1000
+NUM_FLOATS_IN_SORTER_MEMORY = 800
 
 
 def main():
@@ -50,12 +49,10 @@ def main():
 
 def sort(coll, page_size, num_pages):
     print(f'Sorting {num_pages} pages...')
-    print_pages(coll, 'page', num_pages)
     for i in range(num_pages):
         sort_page(coll, f'page-{i}')
 
     print('Finished initial page level sort..')
-    print_pages(coll, 'page', num_pages)
     merge_size = 1
     prev_page_prefix = 'page'
     while merge_size * 2 < num_pages:
@@ -82,7 +79,6 @@ def sort(coll, page_size, num_pages):
                 tuple(f'{prev_page_prefix}-{j}' for j in range(half_page, end_page)),
                 tuple(f'{new_page_prefix}-{j}' for j in range(start_page, end_page))
             )
-        print_pages(coll, new_page_prefix, num_pages)
         prev_page_prefix = new_page_prefix
 
     print('Performing final merge...')
@@ -97,20 +93,10 @@ def sort(coll, page_size, num_pages):
         tuple(f'{prev_page_prefix}-{j}' for j in range(half_page, end_page)),
         tuple(f'page-{j}' for j in range(start_page, end_page))
     )
-    print_pages(coll, 'page', num_pages)
-
-
-def print_pages(coll, prefix, num_pages):
-    if not VERBOSE:
-        return
-    for i in range(num_pages):
-        print(coll.read_doc(f'{prefix}-{i}'))
 
 
 def sort_page(coll, page):
     arr = np.array(coll.read_doc(page))
-    if not arr.shape:
-        raise Exception(f'missing page at {page}')
     arr.sort()
     coll.create_or_overwrite_doc(page, arr.tolist())
 
