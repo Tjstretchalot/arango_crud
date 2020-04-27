@@ -3,7 +3,7 @@ name: CI
 on: [push]
 
 jobs:
-  test_proxy:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -41,7 +41,18 @@ jobs:
         coverage run -m unittest discover -s tests
         coverage combine
         coverage report --fail-under 70
+      env:
+        TEST_ARANGO_CLUSTER_URLS: http://127.0.0.1:8529
+        TEST_ARANGO_DB: test_arango_crud
+        TEST_ARANGO_USERNAME: root
     - name: Run examples..
       run: |
         coverage run --rcfile=.coveragerc_examples examples/run_all.py
         coverage report --fail-under 100
+      env:
+        ARANGO_CLUSTER: http://127.0.0.1:8529
+        ARANGO_DB: arango_crud
+        ARANGO_AUTH: basic
+        ARANGO_AUTH_USERNAME: root
+        ARANGO_APPLY_BASIC_CONFIG: true
+        ARANGO_TTL_SECONDS: 3600
