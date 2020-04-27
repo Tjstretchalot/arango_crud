@@ -301,8 +301,8 @@ assert bar is None
 ```
 
 Hence any PR where the coverage in the examples directory is less than 100%
-when running `coverage run --source=examples examples/run_all.py` will have
-changes requested.
+when running `coverage run --rcfile=.coveragerc_examples examples/run_all.py`
+will have changes requested.
 
 This repository is focused specifically on using ArangoDB as a disk-based
 cache. Functionality which doesn't support that use-case will have their PR
@@ -325,10 +325,10 @@ python -m pip install --upgrade pip
 "venv/Scripts/activate.bat"
 python -m pip install -r dev_requirements.txt
 "scripts/windows_dev_env.bat"
-coverage run --concurrency=multiprocessing --source=src -m unittest discover -s tests
+coverage run -m unittest discover -s tests
 coverage combine
 coverage report
-coverage run --source=examples examples/run_all.py
+coverage run --rcfile=.coveragerc_examples examples/run_all.py
 coverage report
 ```
 
@@ -346,7 +346,7 @@ python -m pip install -r dev_requirements.txt
 coverage run -m unittest discover -s tests
 coverage combine
 coverage report
-coverage run --source=examples examples/run_all.py
+coverage run --rcfile=.coveragerc_examples examples/run_all.py
 coverage report
 ```
 

@@ -1,0 +1,47 @@
+name: CI
+
+on: [push]
+
+jobs:
+  test_proxy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python_version: [3.7, 3.8]
+    services:
+      arangodb:
+        image: arangodb/arangodb
+        ports:
+          - 8529/tcp
+        env:
+          ARANGO_NO_AUTH: 1
+    steps:
+    - name: Setup Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python_version }}
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r dev_requirements.txt
+        python -m pip install numpy
+    - name: flake8 src
+      run: |
+        flake8 src
+    - name: flake8 tests
+      run: |
+        flake8 tests
+    - name: flake8 examples
+      run: |
+        flake8 examples
+    - name: Run tests..
+      run: |
+        coverage run -m unittest discover -s tests
+        coverage combine
+        coverage report --fail-under 70
+    - name: Run examples..
+      run: |
+        coverage run --rcfile=.coveragerc_examples examples/run_all.py
+        coverage report --fail-under 100
