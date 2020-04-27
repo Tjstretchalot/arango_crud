@@ -15,8 +15,8 @@ def main():
     # variables directly, but we do this here to make the example have as
     # little magic as possible.
     urls = os.environ.get('ARANGO_CLUSTER', 'http://localhost:8529').split(',')
-    username = os.environ.get('ARANGO_USERNAME', 'root')
-    password = os.environ.get('ARANGO_PASSWORD')
+    username = os.environ.get('ARANGO_AUTH_USERNAME', 'root')
+    password = os.environ.get('ARANGO_AUTH_PASSWORD')
 
     cfg = Config(
         cluster=RandomCluster(urls=urls),
