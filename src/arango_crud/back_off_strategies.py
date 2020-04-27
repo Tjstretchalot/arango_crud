@@ -15,7 +15,7 @@ class BackOffStrategy:
             Either a float which is the number of seconds to sleep before
             attempting the request again or None to raise an error.
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class StepBackOffStrategy(BackOffStrategy):

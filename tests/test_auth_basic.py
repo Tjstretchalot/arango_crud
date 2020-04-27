@@ -23,6 +23,13 @@ class Test(unittest.TestCase):
         db = cfg.database(helper.TEST_ARANGO_DB)
         self.assertFalse(db.check_if_exists())
 
+    def test_recover(self):
+        auth = BasicAuth(
+            username=helper.TEST_USERNAME,
+            password=helper.TEST_PASSWORD
+        )
+        self.assertFalse(auth.try_recover_auth_failure())
+
 
 if __name__ == '__main__':
     unittest.main()

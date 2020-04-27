@@ -325,7 +325,8 @@ python -m pip install --upgrade pip
 "venv/Scripts/activate.bat"
 python -m pip install -r dev_requirements.txt
 "scripts/windows_dev_env.bat"
-coverage run --source=src -m unittest discover -s tests
+coverage run --concurrency=multiprocessing --source=src -m unittest discover -s tests
+coverage combine
 coverage report
 coverage run --source=examples examples/run_all.py
 coverage report
@@ -341,7 +342,9 @@ python -m pip install --upgrade pip
 . venv/bin/activate
 . scripts/nix_dev_env.sh
 python -m pip install -r dev_requirements.txt
-coverage run --source=src -m unittest discover -s tests
+# This pulls from .coveragerc to handle multiprocessing
+coverage run -m unittest discover -s tests
+coverage combine
 coverage report
 coverage run --source=examples examples/run_all.py
 coverage report

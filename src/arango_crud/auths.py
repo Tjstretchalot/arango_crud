@@ -26,7 +26,7 @@ class Auth:
         @param [Config] config The configuration to use to make any requests
             if necessary
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def try_recover_auth_failure(self):
         """This is called after the server rejects our authorization from this
@@ -36,7 +36,7 @@ class Auth:
         Returns:
             True if authorization was refreshed and False otherwise
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def authorize(self, headers, config):
         """Adds the required authentication headers to the given dict of
@@ -49,7 +49,7 @@ class Auth:
             config (Config): The config to use for making any requests required
                 to authorize
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class BasicAuth(Auth):
@@ -100,7 +100,7 @@ class StatefulAuth(Auth):
         """Returns a deep copy of this instance with all the state removed.
         For example, a JWT strategy would return a new instance with no JWT
         token initialized."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class StatefulAuthWrapper(Auth):
@@ -167,9 +167,9 @@ class StatefulAuthWrapper(Auth):
         if threading.get_ident() != self.tid:
             raise RuntimeError(
                 'This StatefulAuthWrapper verifies that it is not being used '
-                + 'on different threads or different processes in order to ensure ' +
-                + 'the authorization approach does not get corrupted. When running ' +
-                + 'in multiple processes this can be handled automatically by this ' +
+                + 'on different threads or different processes in order to ensure '
+                + 'the authorization approach does not get corrupted. When running '
+                + 'in multiple processes this can be handled automatically by this '
                 + 'instance reinitializing state, as writing to our instance variables '
                 + "won't be replicated across other processes. However, this detected "
                 + f'it was being run on process {self.pid}, thread {self.tid} and is now '
@@ -198,7 +198,7 @@ class JWTCache:
             If the cache has a value, this is the JWTToken in the cache.
             Otherwise this is None.
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def try_acquire_lock(self):
         """Attempt to acquire permission to fetch a new token. This might
@@ -209,7 +209,7 @@ class JWTCache:
         Returns:
             True if the lock was acquired, False otherwise
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def try_set(self, token):
         """Attempt to set the value in the cache to the given token. Only
@@ -225,7 +225,7 @@ class JWTCache:
             True if the cache was updated. Otherwise, when we lost access to
             the lock and hence did nothing, returns False.
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class JWTDiskCache(JWTCache):
@@ -499,8 +499,6 @@ class JWTAuth(StatefulAuth):
                 'password': self.password
             }
         )
-        if resp.status_code != 200:
-            print(resp.json())
         resp.raise_for_status()
         token = resp.json()['jwt']
         expected_expire_time = time.time() + 60 * 60 * 24 * 30

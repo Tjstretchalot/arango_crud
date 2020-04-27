@@ -17,7 +17,7 @@ class Cluster:
             The str url to a coordinator not suffixed with a slash. For
             example: http://localhost:5289
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class WeightedRandomCluster(Cluster):

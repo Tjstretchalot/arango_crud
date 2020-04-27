@@ -16,6 +16,10 @@ class Test(unittest.TestCase):
             )
         self.assertIsNone(strat.get_back_off(len(steps) + 1))
 
+    def test_zero_back_off(self):
+        strat = StepBackOffStrategy(steps=[0.1, 0.2, 0.5, 1])
+        self.assertRaises(ValueError, lambda: strat.get_back_off(0))
+
 
 if __name__ == '__main__':
     unittest.main()
