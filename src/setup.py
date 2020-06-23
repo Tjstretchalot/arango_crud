@@ -5,7 +5,7 @@ with open("../README.md", "r") as fh:   # pragma: no cover
 
 setuptools.setup(   # pragma: no cover
     name="arango_crud",
-    version="1.0.1",
+    version="1.0.2",
     author="Timothy Moore",
     author_email="mtimothy984+pypi@gmail.com",
     description="A wrapper around ArangoDB CRUD HTTP API",
