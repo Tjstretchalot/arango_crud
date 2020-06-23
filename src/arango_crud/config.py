@@ -24,6 +24,9 @@ class Config:
             so manual intervention is required to change this from None to
             not-None.
         auth (Auth): Sets authentication headers.
+        verify (str, None): If specified, then requests should verify certs
+            using the certificate bundle at this path. This is forwarded
+            directly to requests.
         disable_database_delete (bool): True if database deletes are prevented,
             False if database deletes are allowed.
         protected_databases (list[str]): A list of database names which are
@@ -37,7 +40,7 @@ class Config:
     """
     def __init__(
             self, cluster, timeout_seconds, back_off, ttl_seconds, auth,
-            disable_database_delete=True, protected_databases=None,
+            verify=None, disable_database_delete=True, protected_databases=None,
             disable_collection_delete=True, protected_collections=None):
         """Initializes Config by setting the corresponding attributes. For
         auth if it is a StatefulAuth it is wrapped with a StatefulAuthWrapper.
@@ -55,6 +58,7 @@ class Config:
             back_off=(back_off, BackOffStrategy),
             ttl_seconds=(ttl_seconds, (int, type(None))),
             auth=(auth, Auth),
+            verify=(verify, (str, None)),
             disable_database_delete=(disable_database_delete, bool),
             protected_databases=(protected_databases, (list, tuple)),
             disable_collection_delete=(disable_collection_delete, bool),
@@ -70,6 +74,7 @@ class Config:
         self.back_off = back_off
         self.ttl_seconds = ttl_seconds
         self.auth = auth
+        self.verify = verify
         self.disable_database_delete = disable_database_delete
         self.protected_databases = protected_databases
         self.disable_collection_delete = disable_collection_delete
