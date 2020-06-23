@@ -41,7 +41,10 @@ def env_config(cfg=None):
                             the second URL receives 2x as many requests as URL
                             1 and 3, which only happens with the probability
                             distribution 25%, 50%, 25%.
-
+            ARANGO_VERIFY (str, None): If specified should be a path to a
+                certificate bundle to use to verify SSL certificates.
+                Forwarded directly to requests using the verify keyword.
+                See https://requests.readthedocs.io/en/master/user/advanced/#ssl-cert-verification
             ARANGO_TIMEOUT_SECONDS (str, None): A float base-10 expansion for
                 the number of seconds before requests to ArangoDB are timed
                 out. https://requests.readthedocs.io/en/master/user/quickstart/#timeouts
@@ -173,6 +176,7 @@ def env_config(cfg=None):
         cfg = os.environ
 
     cluster = env_cluster(cfg)
+    verify = env_verify(cfg)
     timeout_seconds = env_timeout_seconds(cfg)
     back_off = env_back_off(cfg)
     ttl_seconds = env_ttl_seconds(cfg)
@@ -184,6 +188,7 @@ def env_config(cfg=None):
 
     return Config(
         cluster, timeout_seconds, back_off, ttl_seconds, auth,
+        verify=verify,
         disable_database_delete=disable_database_delete,
         protected_databases=protected_databases,
         disable_collection_delete=disable_collection_delete,
@@ -255,6 +260,15 @@ def env_cluster(cfg) -> Cluster:
         raise ValueError(
             f'ARANGO_CLUSTER_STYLE={style} is not a recognized style.'
         )
+
+
+def env_verify(cfg) -> str:
+    """Get the certfile to use for verifying the SSL certificate, if one
+    is explicitly specified. Otherwise return None."""
+    verify_str = cfg.get('ARANGO_VERIFY')
+    if verify_str is None or verify_str == '':
+        return None
+    return verify_str
 
 
 def env_timeout_seconds(cfg) -> int:

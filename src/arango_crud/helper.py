@@ -39,6 +39,8 @@ def http_method(method, config, partial_url: str, **kwargs):
         kwargs['headers'] = {}
     if 'timeout' not in kwargs:
         kwargs['timeout'] = config.timeout_seconds
+    if 'verify' not in kwargs and config.verify is not None:
+        kwargs['verify'] = config.verify
 
     request_number = 1
 

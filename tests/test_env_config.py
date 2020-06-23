@@ -53,6 +53,19 @@ class Test(unittest.TestCase):
         self.assertEqual(cfg.cluster.urls, ['http://localhost:5289', 'http://localhost:5290'])
         self.assertEqual(cfg.cluster.weights, [1.0, 2.1])
 
+    def test_verify(self):
+        cfg = env_config(
+            cfg={
+                'ARANGO_CLUSTER': 'http://localhost:5289',
+                'ARANGO_VERIFY': 'my/verify/certfile',
+                'ARANGO_CLUSTER_STYLE': 'random',
+                'ARANGO_AUTH': 'basic',
+                'ARANGO_AUTH_USERNAME': helper.TEST_USERNAME,
+                'ARANGO_AUTH_PASSWORD': helper.TEST_PASSWORD
+            }
+        )
+        self.assertEqual(cfg.verify, 'my/verify/certfile')
+
     def test_timeout(self):
         cfg = env_config(
             cfg={
