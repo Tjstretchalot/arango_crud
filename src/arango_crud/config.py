@@ -58,7 +58,7 @@ class Config:
             back_off=(back_off, BackOffStrategy),
             ttl_seconds=(ttl_seconds, (int, type(None))),
             auth=(auth, Auth),
-            verify=(verify, (str, None)),
+            verify=(verify, (str, type(None))),
             disable_database_delete=(disable_database_delete, bool),
             protected_databases=(protected_databases, (list, tuple)),
             disable_collection_delete=(disable_collection_delete, bool),
