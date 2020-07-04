@@ -464,7 +464,7 @@ class JWTAuth(StatefulAuth):
         token = self.create_jwt_token(config)
         self.cache.try_set(token)
         self._token = token
-        self._forcing_refresh = False
+        self._forcing_refresh = None
 
     def try_refresh_token(self, config):
         """Attempts to refresh the token. This will do nothing if we fail to
