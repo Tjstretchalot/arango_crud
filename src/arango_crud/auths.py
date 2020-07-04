@@ -384,6 +384,8 @@ class JWTAuth(StatefulAuth):
 
         _token (JWTToken, None): The current token we are authenticating with,
             if we have a token.
+        _forcing_refresh (bool): True if we are going to skip the cache for the
+            next refresh, false otherwise.
     """
     def __init__(self, username, password, cache):
         """Initializes authorization to use the given cache in the future. Does
@@ -399,6 +401,7 @@ class JWTAuth(StatefulAuth):
         self.password = password if password is not None else ''
         self.cache = cache
         self._token = None
+        self._forcing_refresh = False
 
     def prepare(self, config):
         """If this has no token in memory it will attempt to acquire one (first
@@ -421,6 +424,7 @@ class JWTAuth(StatefulAuth):
         True. Otherwise this will return False."""
         if self._token is not None:
             self._token = None
+            self._forcing_refresh = True
             return True
         return False
 
@@ -449,9 +453,10 @@ class JWTAuth(StatefulAuth):
             return
 
         for i in range(math.ceil(self.cache.lock_time_seconds / 10.0)):
-            self._token = self.cache.fetch()
-            if self._token is not None:
-                return
+            if not self._forcing_refresh:
+                self._token = self.cache.fetch()
+                if self._token is not None:
+                    return
             if self.cache.try_acquire_lock():
                 break
             time.sleep(0.1)
@@ -459,6 +464,7 @@ class JWTAuth(StatefulAuth):
         token = self.create_jwt_token(config)
         self.cache.try_set(token)
         self._token = token
+        self._forcing_refresh = False
 
     def try_refresh_token(self, config):
         """Attempts to refresh the token. This will do nothing if we fail to
