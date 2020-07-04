@@ -214,7 +214,9 @@ class Test(unittest.TestCase):
         self.assertIsNotNone(token)
 
         token.token += 'corruption'
+        self.assertTrue(token.token.endswith('corruption'))
         self.assertTrue(jwt_auth.cache.try_set(token))
+        self.assertTrue(token.token.endswith('corruption'))
 
         cfg = create_config()
         cfg.prepare()
