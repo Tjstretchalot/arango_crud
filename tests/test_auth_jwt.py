@@ -213,22 +213,22 @@ class Test(unittest.TestCase):
         token = jwt_auth._token  # noqa
         self.assertIsNotNone(token)
 
-        token.token += 'corruption'
-        self.assertTrue(token.token.endswith('corruption'))
+        token.token = 'corruption'
+        self.assertEqual(token.token, 'corruption')
         self.assertTrue(jwt_auth.cache.try_set(token))
-        self.assertTrue(token.token.endswith('corruption'))
+        self.assertEqual(token.token, 'corruption')
 
         cfg = create_config()
         cfg.prepare()
 
         token = cfg.auth.delegate._token  # noqa
-        self.assertTrue(token.token.endswith('corruption'))
+        self.assertEqual(token.token, 'corruption')
 
         db = cfg.database(helper.TEST_ARANGO_DB)
         self.assertFalse(db.check_if_exists())
 
         token = cfg.auth.delegate._token  # noqa
-        self.assertFalse(token.token.endswith('corruption'))
+        self.assertEqual(token.token, 'corruption')
 
         os.remove('test.jwt')
         if os.path.exists('test.jwt.lock'):
