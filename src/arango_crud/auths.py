@@ -384,6 +384,8 @@ class JWTAuth(StatefulAuth):
 
         _token (JWTToken, None): The current token we are authenticating with,
             if we have a token.
+        _forcing_refresh (str, None): Only set if we have a particular JWT token
+            which we are not satisfied with. Otherwise, None.
     """
     def __init__(self, username, password, cache):
         """Initializes authorization to use the given cache in the future. Does
@@ -399,6 +401,7 @@ class JWTAuth(StatefulAuth):
         self.password = password if password is not None else ''
         self.cache = cache
         self._token = None
+        self._forcing_refresh = None
 
     def prepare(self, config):
         """If this has no token in memory it will attempt to acquire one (first
@@ -406,7 +409,6 @@ class JWTAuth(StatefulAuth):
         will consider refreshing it."""
         if self._token is None:
             self.try_load_or_refresh_token(config)
-            return
 
         if self._token.expires_at_utc_seconds < time.time() + 60:
             self.force_refresh_token(config)
@@ -421,6 +423,7 @@ class JWTAuth(StatefulAuth):
         """If this has an active token it will be cleared and this will return
         True. Otherwise this will return False."""
         if self._token is not None:
+            self._forcing_refresh = self._token.token
             self._token = None
             return True
         return False
@@ -451,8 +454,9 @@ class JWTAuth(StatefulAuth):
 
         for i in range(math.ceil(self.cache.lock_time_seconds / 10.0)):
             self._token = self.cache.fetch()
-            if self._token is not None:
+            if self._token is not None and self._forcing_refresh != self._token.token:
                 return
+            self._token = None
             if self.cache.try_acquire_lock():
                 break
             time.sleep(0.1)
@@ -460,6 +464,7 @@ class JWTAuth(StatefulAuth):
         token = self.create_jwt_token(config)
         self.cache.try_set(token)
         self._token = token
+        self._forcing_refresh = None
 
     def try_refresh_token(self, config):
         """Attempts to refresh the token. This will do nothing if we fail to

@@ -178,6 +178,60 @@ class Test(unittest.TestCase):
         os.remove('test.jwt')
         os.remove('test.jwt.lock')
 
+    def test_resets_jwt_on_first_load_if_bad(self):
+        self.assertFalse(os.path.exists('test.jwt'))
+        self.assertFalse(os.path.exists('test.jwt.lock'))
+
+        def create_config():
+            return Config(
+                cluster=RandomCluster(urls=helper.TEST_CLUSTER_URLS),
+                timeout_seconds=10,
+                back_off=StepBackOffStrategy(steps=[1]),
+                ttl_seconds=None,
+                auth=JWTAuth(
+                    username=helper.TEST_USERNAME,
+                    password=helper.TEST_PASSWORD,
+                    cache=JWTDiskCache(
+                        lock_file='test.jwt.lock',
+                        lock_time_seconds=10,
+                        store_file='test.jwt'
+                    )
+                )
+            )
+
+        cfg = create_config()
+        cfg.prepare()
+
+        self.assertTrue(os.path.exists('test.jwt'))
+
+        # This is a little bit of private implementation, but we're essentially
+        # trying to corrupt the JWT which is not something we exposed...
+
+        jwt_auth = cfg.auth.delegate
+        self.assertIsNotNone(jwt_auth)
+
+        token = jwt_auth._token  # noqa
+        self.assertIsNotNone(token)
+
+        token.token = 'corruption'
+        self.assertEqual(token.token, 'corruption')
+        self.assertTrue(jwt_auth.cache.try_set(token))
+        self.assertEqual(token.token, 'corruption')
+
+        cfg = create_config()
+        cfg.prepare()
+
+        token = cfg.auth.delegate._token  # noqa
+        self.assertEqual(token.token, 'corruption')
+        db = cfg.database(helper.TEST_ARANGO_DB)
+        self.assertFalse(db.check_if_exists())
+
+        token = cfg.auth.delegate._token  # noqa
+        self.assertNotEqual(token.token, 'corruption')
+        os.remove('test.jwt')
+        if os.path.exists('test.jwt.lock'):
+            os.remove('test.jwt.lock')
+
 
 if __name__ == '__main__':
     unittest.main()
