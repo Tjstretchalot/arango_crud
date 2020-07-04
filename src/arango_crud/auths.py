@@ -406,7 +406,6 @@ class JWTAuth(StatefulAuth):
         will consider refreshing it."""
         if self._token is None:
             self.try_load_or_refresh_token(config)
-            return
 
         if self._token.expires_at_utc_seconds < time.time() + 60:
             self.force_refresh_token(config)
