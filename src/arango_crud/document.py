@@ -115,7 +115,7 @@ class Document:
                 'value': self.body
             }
         )
-        if resp.status_code == 409:
+        if resp.status_code in (409, 412):
             return False
         resp.raise_for_status()
         if resp.status_code == 201 or resp.status_code == 202:
