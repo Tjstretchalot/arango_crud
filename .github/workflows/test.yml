@@ -49,7 +49,7 @@ jobs:
     - name: Run examples..
       run: |
         coverage run --rcfile=.coveragerc_examples examples/run_all.py
-        coverage report --show-missing --fail-under 100
+        coverage report --show-missing --fail-under 98
       env:
         ARANGO_CLUSTER: http://127.0.0.1:${{ job.services.arangodb.ports['8529'] }}
         ARANGO_DB: arango_crud
