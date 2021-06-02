@@ -300,9 +300,10 @@ bar = foo()
 assert bar is None
 ```
 
-Hence any PR where the coverage in the examples directory is less than 100%
+Hence any PR where the coverage in the examples directory is less than 98%
 when running `coverage run --rcfile=.coveragerc_examples examples/run_all.py`
-will have changes requested.
+will have changes requested. The lines which do not run should be only due to
+random chance.
 
 This repository is focused specifically on using ArangoDB as a disk-based
 cache. Functionality which doesn't support that use-case will have their PR

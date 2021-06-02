@@ -42,7 +42,7 @@ class Database:
 
         resp = helper.http_post(
             self.config,
-            f'/_api/database',
+            '/_api/database',
             json={
                 'name': self.name,
                 'users': [
