@@ -35,7 +35,7 @@ class StepBackOffStrategy(BackOffStrategy):
     def get_back_off(self, num_failed_requests):
         tus.check(num_failed_requests=(num_failed_requests, int))
         if num_failed_requests <= 0:
-            raise ValueError(f'Backoff only makes sense after failed requests!')
+            raise ValueError('Backoff only makes sense after failed requests!')
         if num_failed_requests <= len(self.steps):
             return self.steps[num_failed_requests - 1]
         return None

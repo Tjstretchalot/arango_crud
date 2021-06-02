@@ -367,7 +367,7 @@ def env_auth(cfg, timeout_seconds: int) -> Auth:
     style = cfg.get('ARANGO_AUTH')
     if style is None or style == '':
         raise ValueError(
-            f'ARANGO_AUTH is missing but is required.'
+            'ARANGO_AUTH is missing but is required.'
         )
 
     username = cfg.get('ARANGO_AUTH_USERNAME')
